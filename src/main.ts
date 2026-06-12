@@ -99,6 +99,7 @@ function endBattleCleanup(): void {
   for (const sv of shipViews) sv.dispose(shell.scene);
   shipViews = [];
   effects.clearTransient();
+  hud.syncBoarding(null);
   battle = null;
 }
 
@@ -145,12 +146,22 @@ function showVictory(): void {
 const input = new Input({
   setAmmo: (i) => {
     if (mode === 'battle' && battle && !paused) {
+      if (battle.phase === 'board') {
+        battle.boardSend(i);
+        return;
+      }
       battle.setAmmo(i);
       hud.setAmmoUI(i);
     }
   },
   fire: (side) => {
-    if (mode === 'battle' && battle && !paused) battle.fire(battle.P(), side);
+    if (mode === 'battle' && battle && !paused) {
+      if (battle.phase === 'board') {
+        if (side === 0) battle.boardSwivel();
+        return;
+      }
+      battle.fire(battle.P(), side);
+    }
   },
   sailUp: () => {
     if (paused) return;
@@ -167,6 +178,10 @@ const input = new Input({
   },
   toggleOrder: () => {
     if (mode === 'battle' && battle && !paused) {
+      if (battle.phase === 'board') {
+        battle.boardPress();
+        return;
+      }
       battle.toggleOrder();
       hud.syncOrderBtn(battle);
     }
@@ -192,6 +207,15 @@ const input = new Input({
 
 hud.onTakeHelm = (idx) => {
   if (mode === 'battle' && battle && !paused && battle.takeHelm(idx)) hud.applyHelmUI(battle);
+};
+hud.onBoardSend = (i) => {
+  if (mode === 'battle' && battle && !paused) battle.boardSend(i);
+};
+hud.onBoardSwivel = () => {
+  if (mode === 'battle' && battle && !paused) battle.boardSwivel();
+};
+hud.onBoardPress = () => {
+  if (mode === 'battle' && battle && !paused) battle.boardPress();
 };
 
 harbor.bind();
@@ -359,6 +383,7 @@ function frame(now: number): void {
     effects.syncBalls(battle.balls, simTime);
     effects.update(paused ? 0 : dtReal);
     hud.sync(battle, paused);
+    hud.syncBoarding(battle.phase === 'board' ? battle.board : null);
     hud.syncOffscreen(
       shell.camera,
       battle.living('e').map((e) => ({ x: e.x, y: e.y, color: 'rgba(196,88,58,.85)' })),

@@ -12,8 +12,10 @@ import { stepShipPhysics, windEff } from './physics';
 import { EventQueue } from './events';
 import { Rng } from './rng';
 import type {
-  Ball, BattlePhase, BoardState, PendingFire, Ship, Team, Wind,
+  Ball, BattlePhase, PendingFire, Ship, Team, Wind,
 } from './types';
+import * as boarding from './boarding';
+import type { BoardingState } from './boarding';
 import type { RunState } from './types';
 import { flagStats } from './run';
 
@@ -67,7 +69,7 @@ export class Battle {
   balls: Ball[] = [];
   pendingFires: PendingFire[] = [];
   phase: BattlePhase = 'sail';
-  board: BoardState | null = null;
+  board: BoardingState | null = null;
   formUp = false;
 
   private volleyRakeLogged = new Set<number>();
@@ -501,44 +503,46 @@ export class Battle {
     const foe = this.boardTarget();
     if (!foe) return;
     this.phase = 'board';
-    this.board = { p: Math.round(this.P().crew), e: Math.round(foe.crew), foe, tick: 0 };
-    this.events.feed('BOARDING ' + foe.name + '…');
+    this.board = boarding.startBoarding(this.P(), foe);
+    this.events.feed('GRAPPLES AWAY — boarding ' + foe.name);
+    this.events.feed('1/2/3 send hands · Q swivel · G press the attack');
     this.events.boom(0.4, 0.5, 180);
+  }
+
+  /** boarding commands, forwarded from input while the deck fight runs */
+  boardSend(section: number): void {
+    if (this.board) boarding.sendHands(this.board, section);
+  }
+
+  boardSwivel(): void {
+    if (this.board && boarding.fireSwivel(this.board)) {
+      this.events.feed('Swivel gun loaded — it will speak in a moment');
+    }
+  }
+
+  boardPress(): void {
+    if (this.board) {
+      boarding.togglePress(this.board);
+      this.events.feed(this.board.press ? 'PRESS THE ATTACK — no quarter asked' : 'Hold and bleed them — steady now');
+    }
   }
 
   private updateBoarding(dt: number): void {
     const board = this.board!;
-    const rng = this.rng;
-    board.tick += dt;
     this.P().speed *= 0.95;
     board.foe.speed *= 0.95;
-    if (board.tick >= 0.55) {
-      board.tick = 0;
-      const pPow = board.p * rng.rnd(0.8, 1.2);
-      const ePow = board.e * rng.rnd(0.8, 1.2);
-      board.e = Math.max(0, board.e - Math.round(pPow * 0.09 + rng.rnd(0, 2)));
-      board.p = Math.max(0, board.p - Math.round(ePow * 0.09 + rng.rnd(0, 2)));
-      this.events.boom(0.12, 0.12, 900);
-      const pq = board.p <= Math.max(4, this.P().maxCrew * 0.1);
-      const eq = board.e <= Math.max(4, board.foe.maxCrew * 0.1);
-      if (pq || eq) {
-        this.P().crew = board.p;
-        board.foe.crew = board.e;
-        if (eq && !pq) {
-          board.foe.struck = true;
-          this.events.feed(board.foe.name + ' is taken!');
-        } else if (pq && !eq) {
-          this.P().struck = true;
-          this.events.feed('Boarders repelled — ' + this.P().name + ' is lost');
-        } else {
-          this.P().struck = true;
-          board.foe.struck = true;
-        }
-        this.board = null;
-        this.phase = 'sail';
-        return;
+    boarding.stepBoarding(board, dt, this.rng, this.events, this.P().name, this.P().maxCrew);
+    if (board.done) {
+      const me = this.P();
+      me.crew = boarding.totalP(board);
+      board.foe.crew = boarding.totalE(board);
+      if (board.done === 'taken') {
+        board.foe.struck = true;
+      } else {
+        me.struck = true;
       }
-      this.events.feed('Boarding… you ' + board.p + ' / them ' + board.e);
+      this.board = null;
+      this.phase = 'sail';
     }
   }
 

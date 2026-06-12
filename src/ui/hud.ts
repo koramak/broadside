@@ -9,6 +9,8 @@ import { GOODS, cargoLoad, fleetCargoCap } from '../sim/economy';
 import { FACTIONS } from '../sim/worldgen';
 import { clamp } from '../sim/math';
 import type { RunState } from '../sim/types';
+import { SECTION_NAMES } from '../sim/boarding';
+import type { BoardingState } from '../sim/boarding';
 import { audio } from '../audio';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -207,6 +209,77 @@ export class Hud {
 
   hideArrows(): void {
     for (const el of this.arrowPool) el.style.display = 'none';
+  }
+
+  /* ============ boarding panel ============ */
+
+  private boardingRows: { bp: HTMLElement; be: HTMLElement; num: HTMLElement; send: HTMLButtonElement }[] = [];
+  onBoardSend: (section: number) => void = () => {};
+  onBoardSwivel: () => void = () => {};
+  onBoardPress: () => void = () => {};
+
+  private buildBoardingRows(): void {
+    if (this.boardingRows.length) return;
+    const wrap = $('bsections');
+    SECTION_NAMES.forEach((name, i) => {
+      const row = document.createElement('div');
+      row.className = 'bsec';
+      row.innerHTML =
+        `<span class="bn">${name}</span><div class="bbar"><div class="bp"></div><div class="be"></div></div>` +
+        `<span class="bnum"></span>`;
+      const send = document.createElement('button');
+      send.textContent = 'SEND 10 (' + (i + 1) + ')';
+      send.addEventListener('click', () => {
+        audio();
+        this.onBoardSend(i);
+      });
+      row.appendChild(send);
+      wrap.appendChild(row);
+      this.boardingRows.push({
+        bp: row.querySelector('.bp') as HTMLElement,
+        be: row.querySelector('.be') as HTMLElement,
+        num: row.querySelector('.bnum') as HTMLElement,
+        send,
+      });
+    });
+    $('bswivel').addEventListener('click', () => {
+      audio();
+      this.onBoardSwivel();
+    });
+    $('bpress').addEventListener('click', () => {
+      audio();
+      this.onBoardPress();
+    });
+  }
+
+  syncBoarding(board: BoardingState | null): void {
+    const panel = $('boarding');
+    if (!board) {
+      panel.style.display = 'none';
+      return;
+    }
+    this.buildBoardingRows();
+    panel.style.display = 'block';
+    $('btitle').textContent = 'BOARDING — ' + board.foe.name;
+    for (let i = 0; i < 3; i++) {
+      const r = this.boardingRows[i];
+      const p = board.secP[i];
+      const e = board.secE[i];
+      const span = Math.max(p + e, 1);
+      r.bp.style.width = (p / span) * 48 + '%';
+      r.be.style.width = (e / span) * 48 + '%';
+      const incoming = board.transits.filter((t) => t.section === i).reduce((t, tr) => t + tr.n, 0);
+      r.num.textContent = Math.round(p) + (incoming ? '+' + incoming : '') + ' / ' + Math.round(e);
+      r.send.disabled = board.pReserve < 1;
+      // swivel telegraph: flash the threatened section
+      const tel = board.swivelTarget && board.swivelTarget.section === i;
+      r.be.style.opacity = tel ? '0.45' : '0.85';
+    }
+    $('breserve').textContent =
+      'RESERVE ' + Math.round(board.pReserve) + ' · THEIRS ' + Math.round(board.eReserve);
+    ($('bswivel') as HTMLButtonElement).disabled = board.swivelCd > 0 || !!board.swivelTarget;
+    $('bswivel').textContent = board.swivelCd > 0 ? 'SWIVEL ' + board.swivelCd.toFixed(0) + 's' : 'SWIVEL (Q)';
+    $('bpress').classList.toggle('on', board.press);
   }
 
   /* ============ map mode ============ */

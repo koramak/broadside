@@ -51,6 +51,19 @@ button:disabled{opacity:.35;cursor:default}
 #sigbtn{border-color:var(--gold)}
 #boardbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
 #dockbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
+#boarding{bottom:90px;left:50%;transform:translateX(-50%);width:420px;max-width:94vw;display:none;z-index:6;border-color:var(--gold)}
+#btitle{color:var(--gold);margin-bottom:5px}
+.bsec{display:flex;align-items:center;gap:8px;margin:4px 0}
+.bsec .bn{width:92px;font-size:9px;font-family:'Courier New',monospace;letter-spacing:.08em;color:var(--parch-dim);text-align:right}
+.bsec .bbar{flex:1;height:12px;background:rgba(233,220,190,.1);border-radius:3px;position:relative;overflow:hidden}
+.bsec .bp{position:absolute;left:0;top:0;bottom:0;background:var(--gold);opacity:.85}
+.bsec .be{position:absolute;right:0;top:0;bottom:0;background:var(--rust);opacity:.85}
+.bsec .bnum{width:64px;font-size:9px;font-family:'Courier New',monospace;color:var(--parch)}
+.bsec button{font-size:9px;padding:3px 7px}
+#bfoot{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+#bbtns{display:flex;gap:6px}
+#bbtns button{font-size:9px;padding:4px 9px}
+#bbtns button.on{background:rgba(196,88,58,.3);border-color:var(--rust)}
 #cargo{bottom:96px;left:12px;display:none;z-index:5;min-width:170px}
 #cargo .sub{line-height:1.7}
 #rep{top:208px;left:12px;display:none;z-index:5;min-width:170px}

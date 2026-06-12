@@ -70,13 +70,6 @@ export interface PendingFire {
 
 export type BattlePhase = 'sail' | 'board' | 'end';
 
-export interface BoardState {
-  p: number;
-  e: number;
-  foe: Ship;
-  tick: number;
-}
-
 /* ============ run meta-layer ============ */
 
 export interface FlagshipState {
