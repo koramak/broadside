@@ -135,6 +135,42 @@ export const STORY_ACTIONS: StoryAction[] = [
   { n: 4, x: 1600, y: 300 },
   { n: 5, x: 3000, y: -2300 },
   { n: 6, x: 5300, y: 1400 },
+  // beyond the wall — only reachable once the Mist opens
+  { n: 7, x: 6450, y: -600 },
+  { n: 8, x: 6750, y: 1900 },
+  { n: 9, x: 6950, y: -2400 },
+];
+
+/** The Mist's own escalation. Deliberately NOT in constants.ts — the locked
+ *  six-action table stays untouched; this is what waits after it. */
+export interface MistWave {
+  ships: ShipClass[];
+  desc: string;
+  names: string[];
+}
+
+export const MIST_ESCALATION: MistWave[] = [
+  {
+    ships: ['sloop'],
+    desc: 'something keeping pace upwind. That is not a thing ships do.',
+    names: ['The Caulker’s Grief'],
+  },
+  {
+    ships: ['brig', 'brig'],
+    desc: 'a procession. They are not sailing the wind. They are remembering it.',
+    names: ['Wet Bargain', 'The Unpaid'],
+  },
+  {
+    ships: ['frigate', 'sloop'],
+    desc: 'THE HARROW — the thing that has been collecting the sea’s debts',
+    names: ['THE HARROW', 'Salt Tithe'],
+  },
+];
+
+export const MIST_FEED = [
+  'The water is the wrong kind of quiet.',
+  'Your compass works fine. It just seems reluctant.',
+  'The crew have stopped singing. The sea has not.',
 ];
 
 export type Region = 'home' | 'trades' | 'reefs';
@@ -150,12 +186,22 @@ export type ContactBehavior = 'lane' | 'patrol' | 'hunt' | 'flee';
 export interface ContactSpec {
   kind: string;
   label: string;
-  faction: FactionKey;
+  faction?: FactionKey;
   ships: ShipClass[];
   behavior: ContactBehavior;
   loot: number; // bonus stores if you win
   desc: string;
+  ghost?: boolean;
+  names?: string[];
 }
+
+/** What wanders the Mist once it opens. No faction. No negotiating. */
+export const MIST_CONTACT: ContactSpec = {
+  kind: 'drowned', label: 'Something pale', ships: ['brig'],
+  behavior: 'hunt', loot: 30, ghost: true,
+  desc: 'a pale hull with no wake, coming upwind like the wind owes it money',
+  names: ['The Refund'],
+};
 
 export const CONTACT_TABLES: Record<Region, ContactSpec[]> = {
   home: [

@@ -23,6 +23,16 @@ export class SceneShell {
   private sea: THREE.Mesh;
   private seaTime = { value: 0 };
   private seaCenter = { value: new THREE.Vector2() };
+  private bgColor!: THREE.Color;
+  private sun!: THREE.DirectionalLight;
+  /** 0 = living waters, 1 = the Mist */
+  private mood = 0;
+  private moodTarget = 0;
+  private static NORMAL_BG = new THREE.Color(0x0c2530);
+  private static MIST_BG = new THREE.Color(0x36433f);
+  private static NORMAL_SEA = new THREE.Color(0x14424e);
+  private static MIST_SEA = new THREE.Color(0x2c3e38);
+  private seaColorMat!: THREE.MeshPhongMaterial;
   private streakGeo: THREE.BufferGeometry;
   private streaks: { x: number; y: number; p: number }[] = [];
   private streakPos: Float32Array;
@@ -35,13 +45,14 @@ export class SceneShell {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0c2530);
     this.scene.fog = new THREE.Fog(0x0c2530, CAM_DIST * 1.1, CAM_DIST * 3.4);
+    this.bgColor = this.scene.background as THREE.Color;
 
     this.camera = new THREE.PerspectiveCamera(CAM_FOV, innerWidth / innerHeight, 10, CAM_DIST * 5);
 
     // Lighting: warm lamp-over-the-diorama sun + cool sea bounce.
-    const sun = new THREE.DirectionalLight(0xfff2dc, 2.4);
-    sun.position.set(-600, 900, -400);
-    this.scene.add(sun);
+    this.sun = new THREE.DirectionalLight(0xfff2dc, 2.4);
+    this.sun.position.set(-600, 900, -400);
+    this.scene.add(this.sun);
     this.scene.add(new THREE.HemisphereLight(0xbfd8d2, 0x12333d, 0.85));
 
     // Sea: low-poly plane displaced in the vertex shader (GPU — no CPU cost),
@@ -74,6 +85,7 @@ export class SceneShell {
         );
     };
     this.sea = new THREE.Mesh(this.seaGeo, seaMat);
+    this.seaColorMat = seaMat;
     this.scene.add(this.sea);
 
     // Arena boundary: dashed rust circle floating just above the water.
@@ -168,6 +180,20 @@ export class SceneShell {
       this.streakPos[o + 5] = s.y + wdy * len;
     }
     this.streakGeo.attributes.position.needsUpdate = true;
+  }
+
+  /** Cross-fade the world's palette when crossing into the Mist. */
+  setMood(mist: boolean, dt: number): void {
+    this.moodTarget = mist ? 1 : 0;
+    this.mood += (this.moodTarget - this.mood) * Math.min(1, dt * 1.2);
+    const k = this.mood;
+    this.bgColor.lerpColors(SceneShell.NORMAL_BG, SceneShell.MIST_BG, k);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.color.copy(this.bgColor);
+    fog.near = CAM_DIST * (1.1 - 0.55 * k);
+    fog.far = CAM_DIST * (3.4 - 1.6 * k);
+    this.seaColorMat.color.lerpColors(SceneShell.NORMAL_SEA, SceneShell.MIST_SEA, k);
+    this.sun.intensity = 2.4 - 1.3 * k;
   }
 
   render(): void {

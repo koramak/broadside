@@ -22,9 +22,21 @@ export class ShipView {
   private listDir: number;
 
   constructor(public ship: Ship, lib: ModelLibrary, modelOverride?: string) {
-    const name = modelOverride ?? shipModelName(ship.cls, ship.team, ship.faction);
+    const name = modelOverride ?? (ship.ghost ? 'ship-ghost' : shipModelName(ship.cls, ship.team, ship.faction));
     const model = lib.instantiateShip(name, ship.len * 1.06);
     this.group.add(model.root);
+
+    if (ship.ghost) {
+      // pale, half-there, lit from somewhere that isn't the sun
+      model.root.traverse((o) => {
+        if (o instanceof THREE.Mesh) {
+          const m = o.material as THREE.MeshStandardMaterial;
+          m.transparent = true;
+          m.opacity = 0.78;
+          if (m.emissive) m.emissive.setHex(0x1d3a35);
+        }
+      });
+    }
 
     for (const m of model.hullMeshes) {
       const mat = m.material as THREE.MeshStandardMaterial;
@@ -107,10 +119,13 @@ export class ShipView {
     }
 
     // hull chips and darkens with damage — paint scraped off the miniature
-    const hullK = 0.45 + 0.55 * (s.hull / s.maxHull);
-    for (let i = 0; i < this.hullMats.length; i++) {
-      const base = this.baseHullColors[i];
-      this.hullMats[i].color.setRGB(base.r * hullK, base.g * hullK, base.b * hullK);
+    // (ghosts skip this; they are already as ruined as they intend to be)
+    if (!s.ghost) {
+      const hullK = 0.45 + 0.55 * (s.hull / s.maxHull);
+      for (let i = 0; i < this.hullMats.length; i++) {
+        const base = this.baseHullColors[i];
+        this.hullMats[i].color.setRGB(base.r * hullK, base.g * hullK, base.b * hullK);
+      }
     }
 
     this.strikeFlag.visible = s.struck && !s.dead;

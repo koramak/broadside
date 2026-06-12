@@ -40,6 +40,8 @@ export interface Ship {
   dead: boolean;
   /** which flag she flies — drives livery and reputation consequences */
   faction?: FactionKey;
+  /** the Drowned ignore the wind you spent a whole run learning */
+  ghost?: boolean;
 }
 
 export interface Ball {

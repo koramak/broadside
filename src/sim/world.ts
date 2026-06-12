@@ -12,8 +12,8 @@ import { makeShip } from './battle';
 import { flagStats } from './run';
 import type { RunState, Ship } from './types';
 import {
-  CONTACT_TABLES, ISLANDS, PORTS, STORY_ACTIONS, WORLD,
-  regionAt,
+  CONTACT_TABLES, ISLANDS, MIST_CONTACT, MIST_ESCALATION, MIST_FEED, PORTS,
+  STORY_ACTIONS, WORLD, regionAt,
 } from './worldgen';
 import type { ContactSpec, FactionKey, PortDef } from './worldgen';
 import type { GoodKey } from './economy';
@@ -43,6 +43,8 @@ export interface EncounterSpec {
   plate?: boolean;
   loot: number;
   story?: number; // story action number if this is a spine battle
+  ghost?: boolean;
+  names?: string[];
   x: number;
   y: number;
 }
@@ -65,6 +67,8 @@ export class World {
   private nextId = 1;
   private spawnT = 4;
   private mistWarned = false;
+  private mistFeedT = 14;
+  private mistFeedIdx = 0;
   private blockedPortWarned = new Set<string>();
 
   playerRudder = 0;
@@ -106,8 +110,26 @@ export class World {
     });
   }
 
+  /** Is the player past the wall (only possible once it opens)? */
+  inMist(): boolean {
+    return this.player.x > WORLD.mistX;
+  }
+
   private spawnContact(run: RunState): void {
     const rng = this.rng;
+    if (this.inMist()) {
+      // only the Drowned wander here
+      const a = rng.rnd(TAU);
+      const x = this.player.x + Math.cos(a) * SPAWN_BUBBLE;
+      const y = this.player.y + Math.sin(a) * SPAWN_BUBBLE;
+      if (x < WORLD.mistX + 100 || Math.abs(y) > WORLD.height / 2 - 300 || x > WORLD.width / 2 - 200) return;
+      const ship = makeShip(MIST_CONTACT.ships[0], 'e', x, y, rng.rnd(TAU));
+      ship.ghost = true;
+      const c: Contact = { id: this.nextId++, spec: MIST_CONTACT, ship, wpX: x, wpY: y, gone: false };
+      this.pickWaypoint(c);
+      this.contacts.push(c);
+      return;
+    }
     const region = regionAt(this.player.x);
     const table = CONTACT_TABLES[region];
     let spec = rng.pick(table);
@@ -192,14 +214,24 @@ export class World {
     const hw = WORLD.width / 2;
     const hh = WORLD.height / 2;
     if (p.x < -hw) { p.x = -hw; p.speed *= 0.9; }
+    if (p.x > hw) { p.x = hw; p.speed *= 0.9; }
     if (p.y < -hh) { p.y = -hh; p.speed *= 0.9; }
     if (p.y > hh) { p.y = hh; p.speed *= 0.9; }
-    if (p.x > WORLD.mistX) {
+    const mistOpen = run.battle > 6;
+    if (!mistOpen && p.x > WORLD.mistX) {
       p.x = WORLD.mistX;
       p.speed *= 0.8;
       if (!this.mistWarned) {
         this.mistWarned = true;
         this.events.feed('The Mist stands like a wall. Whatever is in there is not ready for you. Or is saving you for later.');
+      }
+    }
+    if (mistOpen && this.inMist()) {
+      this.mistFeedT -= dt;
+      if (this.mistFeedT <= 0) {
+        this.mistFeedT = 22;
+        this.events.feed(MIST_FEED[this.mistFeedIdx % MIST_FEED.length]);
+        this.mistFeedIdx++;
       }
     }
     p.wakeT -= dt;
@@ -268,6 +300,8 @@ export class World {
           desc: c.spec.desc,
           faction: c.spec.faction,
           loot: c.spec.loot,
+          ghost: c.spec.ghost,
+          names: c.spec.names,
           x: p.x,
           y: p.y,
         };
@@ -277,20 +311,34 @@ export class World {
     }
 
     // story marker
-    if (!this.pendingEncounter && run.battle <= 6) {
+    if (!this.pendingEncounter && run.battle <= STORY_ACTIONS.length) {
       const m = STORY_ACTIONS[run.battle - 1];
       if (Math.hypot(m.x - p.x, m.y - p.y) < STORY_RANGE) {
-        const wave = ESCALATION[run.battle - 1];
-        this.pendingEncounter = {
-          ships: wave.ships,
-          desc: wave.desc,
-          faction: 'crown',
-          plate: run.battle === 6,
-          loot: 0,
-          story: run.battle,
-          x: p.x,
-          y: p.y,
-        };
+        if (run.battle <= 6) {
+          const wave = ESCALATION[run.battle - 1];
+          this.pendingEncounter = {
+            ships: wave.ships,
+            desc: wave.desc,
+            faction: 'crown',
+            plate: run.battle === 6,
+            loot: 0,
+            story: run.battle,
+            x: p.x,
+            y: p.y,
+          };
+        } else {
+          const wave = MIST_ESCALATION[run.battle - 7];
+          this.pendingEncounter = {
+            ships: wave.ships,
+            desc: wave.desc,
+            ghost: true,
+            names: wave.names,
+            loot: 30,
+            story: run.battle,
+            x: p.x,
+            y: p.y,
+          };
+        }
       }
     }
   }
@@ -307,10 +355,17 @@ export class World {
       if (enc.faction === 'compania') run.rep.brethren = Math.min(100, run.rep.brethren + 6);
       if (enc.faction === 'brethren') run.rep.crown = Math.min(100, run.rep.crown + 7);
     }
+    if (enc.ghost) {
+      this.events.feed('What it was carrying glints like coin and smells like low tide. Salt-silver spends fine.');
+    }
     if (enc.story) {
       run.battle++;
       if (run.battle <= 6) {
         this.events.feed('The trail leads on. Action ' + run.battle + ' is marked on your chart.');
+      } else if (run.battle === 7) {
+        this.events.feed('East of the Tessellate, the Mist is... folding back. It looks like an invitation. It is not a kind one.');
+      } else if (run.battle <= 9) {
+        this.events.feed('Deeper. The next mark is past where charts apologize and stop.');
       }
     }
   }

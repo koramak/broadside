@@ -84,7 +84,11 @@ function startBattle(spec: BattleSpec): void {
   hud.setMode('battle');
   hud.applyHelmUI(battle);
   hud.syncOrderBtn(battle);
-  $('battleno').textContent = spec.story ? 'ACTION ' + spec.story + ' OF 6' : 'ENGAGEMENT';
+  $('battleno').textContent = spec.story
+    ? spec.story <= 6
+      ? 'ACTION ' + spec.story + ' OF 6'
+      : 'THE MIST — ' + (spec.story - 6) + ' OF 3'
+    : 'ENGAGEMENT';
   worldView?.setVisible(false);
   if (playerMapView) playerMapView.group.visible = false;
   mode = 'battle';
@@ -125,10 +129,12 @@ function showRunOver(title: string, text: string): void {
 
 function showVictory(): void {
   mode = 'over';
-  $('otitle').textContent = 'THE PLATE SHIP IS YOURS';
+  $('otitle').textContent = 'WHAT THE MIST WANTED';
   $('otext').textContent =
-    'Six actions, and the richest hull on the sea strikes to you. ' +
-    'Beyond the Tessellate the Mist is still standing there, pretending not to watch. The run is complete — for now.';
+    'The Harrow comes apart like a bad argument. The Mist holds for one breath — then rolls back east, ' +
+    'unhurried, the way a creditor leaves a paid house. The sea is just water again. ' +
+    'You took the richest hull afloat and then you took the thing that was collecting it. ' +
+    'Somewhere west, taverns are already getting the story wrong.';
   $('runstats').textContent =
     'Prizes: ' + run.stats.prizes + ' · Sunk: ' + run.stats.sunk + ' · Stores: ' + run.stores;
   $('overlay').style.display = 'flex';
@@ -190,10 +196,15 @@ hud.onTakeHelm = (idx) => {
 
 harbor.bind();
 harbor.onSetSail = () => {
-  // aftermath dismissed — back to the chart
-  if (currentEnc && currentEnc.story === 6) {
+  // aftermath dismissed — back to the chart (or, after the Harrow, the end)
+  if (currentEnc && currentEnc.story === 9) {
     showVictory();
     return;
+  }
+  if (currentEnc && currentEnc.story === 6) {
+    hud.clearFeed();
+    hud.feed('The Plate Ship is yours. And east of the Tessellate, the Mist just... opened.');
+    hud.feed('Three more marks on a chart that no longer believes in itself.');
   }
   currentEnc = null;
   enterMap();
@@ -241,8 +252,16 @@ function handleBattleOutcome(): void {
     mode = 'aftermath';
     hud.hideArrows();
     harbor.show(run, masterRng, {
-      title: enc && enc.story ? 'ACTION ' + enc.story + ' WON' : 'THE RECKONING',
-      nextLabel: enc && enc.story === 6 ? 'CLAIM YOUR LEGEND' : 'BACK TO THE CHART',
+      title: enc && enc.story
+        ? enc.story === 6
+          ? 'THE PLATE SHIP IS YOURS'
+          : enc.story === 9
+            ? 'THE HARROW IS BROKEN'
+            : enc.story > 6
+              ? 'THE MIST GIVES GROUND'
+              : 'ACTION ' + enc.story + ' WON'
+        : 'THE RECKONING',
+      nextLabel: enc && enc.story === 9 ? 'CLAIM YOUR LEGEND' : enc && enc.story === 6 ? 'INTO WHAT COMES NEXT' : 'BACK TO THE CHART',
       atSea: true,
     });
   } else {
@@ -291,6 +310,8 @@ function frame(now: number): void {
         faction: currentEnc.faction,
         plate: currentEnc.plate,
         story: currentEnc.story,
+        ghost: currentEnc.ghost,
+        names: currentEnc.names,
       });
     }
   }
@@ -326,6 +347,9 @@ function frame(now: number): void {
     }
   }
 
+  // palette follows where the flagship actually is, battle or chart
+  shell.setMood(world ? world.inMist() : false, dtReal);
+
   // render
   if (mode === 'battle' && battle) {
     const p = battle.P();
@@ -350,7 +374,7 @@ function frame(now: number): void {
     if (mode === 'map') {
       hud.syncMap(world, run);
       const targets: { x: number; y: number; color: string }[] = [];
-      if (run.battle <= 6) {
+      if (run.battle <= STORY_ACTIONS.length) {
         const m = STORY_ACTIONS[run.battle - 1];
         targets.push({ x: m.x, y: m.y, color: 'rgba(217,164,65,.9)' });
       }

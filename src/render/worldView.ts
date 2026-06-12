@@ -98,7 +98,7 @@ export class WorldView {
 
   update(world: World, run: { battle: number }, time: number): void {
     // story marker follows current action
-    if (run.battle <= 6) {
+    if (run.battle <= STORY_ACTIONS.length) {
       const m = STORY_ACTIONS[run.battle - 1];
       this.marker.visible = true;
       this.marker.position.set(m.x, 0, m.y);
@@ -108,6 +108,12 @@ export class WorldView {
     } else {
       this.marker.visible = false;
     }
+
+    // once the Plate Ship falls, the wall thins to a suggestion
+    const mistOpen = run.battle > 6;
+    this.mistMat.opacity = mistOpen
+      ? 0.08 + 0.03 * Math.sin(time * 0.7)
+      : 0.26 + 0.08 * Math.sin(time * 0.7);
 
     // contacts
     const seen = new Set<number>();
@@ -150,8 +156,6 @@ export class WorldView {
       }
     }
 
-    // mist breathes
-    this.mistMat.opacity = 0.26 + 0.08 * Math.sin(time * 0.7);
   }
 
   setVisible(v: boolean): void {

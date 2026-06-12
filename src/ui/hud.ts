@@ -241,7 +241,11 @@ export class Hud {
     );
     $('knots').textContent = (p.speed / 14).toFixed(1) + ' kn';
     $('battleno').textContent =
-      run.battle <= 6 ? 'ACTION ' + run.battle + ' — SAIL TO THE GOLD MARK' : 'THE SEA IS YOURS';
+      run.battle <= 6
+        ? 'ACTION ' + run.battle + ' — SAIL TO THE GOLD MARK'
+        : run.battle <= 9
+          ? 'THE MIST — ACTION ' + run.battle + ' OF 9'
+          : 'THE SEA REMEMBERS YOU';
 
     const dock = $('dockbtn');
     if (world.canDock) {

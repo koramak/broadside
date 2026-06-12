@@ -33,7 +33,10 @@ export function rudderFac(s: Ship): number {
 export function stepShipPhysics(s: Ship, windDir: number, dt: number): void {
   const spdFac = clamp(s.speed / s.maxSpd, 0, 1);
   s.heading = normAng(s.heading + s.rudder * s.turn * rudderFac(s) * (0.35 + 0.65 * spdFac) * dt);
-  const tgt = s.maxSpd * SAILS[s.sailIdx] * windEff(s.heading, windDir) * (0.3 + 0.7 * s.sailHP / 100);
+  // The Drowned ignore the point-of-sail curve. This is the rule-break the
+  // whole run trains you to feel in your stomach.
+  const eff = s.ghost ? Math.max(windEff(s.heading, windDir), 0.85) : windEff(s.heading, windDir);
+  const tgt = s.maxSpd * SAILS[s.sailIdx] * eff * (0.3 + 0.7 * s.sailHP / 100);
   const rate = tgt > s.speed ? 0.55 : 1.1;
   s.speed += (tgt - s.speed) * clamp(dt * rate, 0, 1);
   s.x += Math.cos(s.heading) * s.speed * dt;

@@ -29,6 +29,9 @@ export interface BattleSpec {
   faction?: FactionKey;
   plate?: boolean;
   story?: number;
+  /** the Drowned: wind-immune, never strike, cannot be boarded or taken */
+  ghost?: boolean;
+  names?: string[];
 }
 
 export function makeShip(
@@ -130,6 +133,16 @@ export class Battle {
       e.doctrine = cap[1];
       e.faction = spec.faction;
       e.name = (spec.plate && i === 0) ? 'THE PLATE SHIP' : CLASSES[ecls].name + ' ' + shipName();
+      if (spec.ghost) {
+        e.ghost = true;
+        e.doctrine = 'corsair';
+        e.captain = ['—', 'corsair'];
+        e.name = spec.names?.[i] ?? 'The Nameless';
+        // half the gun ports answer; the dead trade broadside weight for the
+        // wind-immunity that makes them terrifying anyway
+        const g = Math.ceil(e.gunsMax / 2);
+        e.gunsLeft = [g, g];
+      }
       this.ships.push(e);
     });
 
@@ -179,7 +192,7 @@ export class Battle {
       s.y += Math.sin(s.heading) * s.speed * dt;
       if (s.sinking > 3.4 && !s.dead) {
         s.dead = true;
-        this.events.feed(s.name + ' goes down');
+        this.events.feed(s.ghost ? s.name + ' dissolves into the water it came from' : s.name + ' goes down');
         this.events.emit({ kind: 'shipSunk', ship: s });
       }
       return;
@@ -292,9 +305,13 @@ export class Battle {
       this.volleyRakeLogged.add(b.vid);
       this.events.feed('Raking fire down the deck of ' + tgt.name + '!');
     }
+    // ghosts: round shot breaks the bones fine, but canvas-shredders and
+    // man-killers find nothing much to bite
+    const ghostSail = tgt.ghost ? 0.5 : 1;
+    const ghostCrew = tgt.ghost ? 0.3 : 1;
     tgt.hull = Math.max(0, tgt.hull - a.hull * rng.rnd(0.7, 1.3) * mult);
-    tgt.sailHP = Math.max(0, tgt.sailHP - a.sail * rng.rnd(0.7, 1.3) * (rake ? 1.3 : 1));
-    tgt.crew = Math.max(0, tgt.crew - a.crew * rng.rnd(0.7, 1.3) * (rake ? 1.4 : 1));
+    tgt.sailHP = Math.max(0, tgt.sailHP - a.sail * rng.rnd(0.7, 1.3) * (rake ? 1.3 : 1) * ghostSail);
+    tgt.crew = Math.max(0, tgt.crew - a.crew * rng.rnd(0.7, 1.3) * (rake ? 1.4 : 1) * ghostCrew);
     if (loc.lx < -tgt.len * 0.25 && (b.ammo === 0 || b.ammo === 1)) {
       const before = tgt.rudderHP;
       tgt.rudderHP = Math.max(0, tgt.rudderHP - (b.ammo === 0 ? 15 : 8));
@@ -316,9 +333,15 @@ export class Battle {
     this.events.boom(0.16, 0.18, 700);
     if (tgt.hull <= 0 && !tgt.sinking) tgt.sinking = 0.001;
     if (tgt.crew <= Math.max(6, tgt.maxCrew * 0.08) && !tgt.struck && !tgt.sinking) {
-      tgt.struck = true;
-      this.events.feed(tgt.name + ' strikes her colors!');
-      this.events.emit({ kind: 'shipStruck', ship: tgt });
+      if (tgt.ghost) {
+        // nothing aboard to surrender; what's left just stops pretending
+        tgt.sinking = 0.001;
+        this.events.feed(tgt.name + ' forgets how to float');
+      } else {
+        tgt.struck = true;
+        this.events.feed(tgt.name + ' strikes her colors!');
+        this.events.emit({ kind: 'shipStruck', ship: tgt });
+      }
     }
   }
 
@@ -465,7 +488,7 @@ export class Battle {
   boardTarget(): Ship | null {
     const s = this.P();
     const foe = this.nearestEnemy(s);
-    if (!foe) return null;
+    if (!foe || foe.ghost) return null; // you cannot grapple what isn't there
     const d = dist(s, foe);
     const rv = Math.hypot(
       Math.cos(s.heading) * s.speed - Math.cos(foe.heading) * foe.speed,
