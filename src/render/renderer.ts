@@ -21,6 +21,8 @@ export class SceneShell {
   private camTarget = new THREE.Vector3();
   private seaGeo: THREE.PlaneGeometry;
   private sea: THREE.Mesh;
+  private seaTime = { value: 0 };
+  private seaCenter = { value: new THREE.Vector2() };
   private streakGeo: THREE.BufferGeometry;
   private streaks: { x: number; y: number; p: number }[] = [];
   private streakPos: Float32Array;
@@ -42,7 +44,8 @@ export class SceneShell {
     this.scene.add(sun);
     this.scene.add(new THREE.HemisphereLight(0xbfd8d2, 0x12333d, 0.85));
 
-    // Sea: displaced low-poly plane, flat shaded, follows the camera target.
+    // Sea: low-poly plane displaced in the vertex shader (GPU — no CPU cost),
+    // flat shaded so the swells read as carved facets. Follows the camera.
     this.seaGeo = new THREE.PlaneGeometry(SEA_SIZE, SEA_SIZE, SEA_SEGS, SEA_SEGS);
     this.seaGeo.rotateX(-Math.PI / 2);
     const seaMat = new THREE.MeshPhongMaterial({
@@ -52,6 +55,24 @@ export class SceneShell {
       shininess: 42,
       flatShading: true,
     });
+    seaMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = this.seaTime;
+      shader.uniforms.uCenter = this.seaCenter;
+      shader.vertexShader =
+        'uniform float uTime;\nuniform vec2 uCenter;\n' +
+        shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          {
+            float wx = transformed.x + uCenter.x;
+            float wz = transformed.z + uCenter.y;
+            float t = uTime * 0.6;
+            float a = sin(wx * 0.011 + t) + sin(wz * 0.013 + t * 0.83);
+            float b = sin((wx + wz) * 0.0061 + t * 0.52);
+            transformed.y += (abs(a) - 1.0) * 5.2 + b * 3.4;
+          }`,
+        );
+    };
     this.sea = new THREE.Mesh(this.seaGeo, seaMat);
     this.scene.add(this.sea);
 
@@ -111,20 +132,8 @@ export class SceneShell {
     const cx = Math.round(this.camTarget.x / cell) * cell;
     const cz = Math.round(this.camTarget.z / cell) * cell;
     this.sea.position.set(cx, 0, cz);
-
-    const pos = this.seaGeo.attributes.position;
-    const arr = pos.array as Float32Array;
-    const t = time * 0.6;
-    for (let i = 0; i < pos.count; i++) {
-      const wx = arr[i * 3] + cx;
-      const wz = arr[i * 3 + 2] + cz;
-      // Two crossing directional swells + a slow chop. Ridged: abs() folds the wave.
-      const a = Math.sin(wx * 0.011 + t) + Math.sin(wz * 0.013 + t * 0.83);
-      const b = Math.sin((wx + wz) * 0.0061 + t * 0.52);
-      arr[i * 3 + 1] = (Math.abs(a) - 1) * 5.2 + b * 3.4;
-    }
-    pos.needsUpdate = true;
-    this.seaGeo.computeVertexNormals();
+    this.seaCenter.value.set(cx, cz);
+    this.seaTime.value = time;
 
     // Streaks
     const wdx = Math.cos(windDir);

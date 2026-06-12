@@ -16,11 +16,14 @@ import { HarborScreen } from './ui/harbor';
 import { Input } from './input/input';
 import { audio, boom } from './audio';
 
+import { ModelLibrary, PROP_MODEL_NAMES, SHIP_MODEL_NAMES } from './render/models';
+
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const shell = new SceneShell(canvas);
 const effects = new Effects(shell.scene);
 const hud = new Hud();
 const harbor = new HarborScreen();
+const lib = new ModelLibrary();
 
 let run: RunState = newRun();
 // master RNG seeds each battle; reseeded per run so runs differ
@@ -44,7 +47,7 @@ function startBattle(): void {
 
   battle = new Battle(run, masterRng.int(2 ** 31));
   for (const s of battle.ships) {
-    const sv = new ShipView(s);
+    const sv = new ShipView(s, lib);
     shell.scene.add(sv.group);
     shipViews.push(sv);
   }
@@ -152,9 +155,12 @@ let simTime = 0;
 /** Test hook: when true the main loop renders but never steps the sim. */
 let freeze = false;
 
+let frameCount = 0;
+
 function frame(now: number): void {
   const dtReal = Math.min((now - last) / 1000, 0.25);
   last = now;
+  frameCount++;
 
   if (battle && mode === 'battle' && !paused && !freeze) {
     acc += dtReal;
@@ -218,7 +224,7 @@ function frame(now: number): void {
     const p = battle.P();
     shell.follow(p.x, p.y, dtReal);
     shell.updateEnvironment(simTime, battle.wind.dir, paused || mode !== 'battle');
-    for (const sv of shipViews) sv.update(sv.ship === p);
+    for (const sv of shipViews) sv.update(sv.ship === p, simTime);
     effects.syncBalls(battle.balls, simTime);
     effects.update(paused ? 0 : dtReal);
     if (mode === 'battle') {
@@ -231,8 +237,34 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 
-startRun();
-requestAnimationFrame(frame);
+// Preload kit models, dress the set, then raise the curtain.
+void (async () => {
+  await lib.preload([...SHIP_MODEL_NAMES, ...PROP_MODEL_NAMES]);
+  // scatter islets just beyond the arena ring — set dressing, no collision
+  const scatterRng = (n: number) => {
+    const x = Math.sin(n * 127.1) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  for (let i = 0; i < 14; i++) {
+    const a = scatterRng(i) * Math.PI * 2;
+    const r = 1700 + 160 + scatterRng(i + 50) * 420;
+    const rock = lib.instantiateProp(
+      ['rocks-a', 'rocks-b', 'rocks-c'][i % 3],
+      26 + scatterRng(i + 100) * 30,
+    );
+    rock.position.set(Math.cos(a) * r, -2, Math.sin(a) * r);
+    rock.rotation.y = scatterRng(i + 150) * Math.PI * 2;
+    shell.scene.add(rock);
+    if (i % 4 === 0) {
+      const palm = lib.instantiateProp(i % 8 === 0 ? 'palm-bend' : 'palm-straight', 20);
+      palm.position.set(Math.cos(a) * r, 4, Math.sin(a) * r);
+      palm.rotation.y = scatterRng(i + 200) * Math.PI * 2;
+      shell.scene.add(palm);
+    }
+  }
+  startRun();
+  requestAnimationFrame(frame);
+})();
 
 // Dev/debug handle for automated verification (harmless in production).
 declare global {
@@ -263,4 +295,7 @@ window.__broadside = {
     startBattle();
   },
   startRun,
+  get frames() {
+    return frameCount;
+  },
 };
