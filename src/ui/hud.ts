@@ -5,7 +5,10 @@ import * as THREE from 'three';
 import type { Battle } from '../sim/battle';
 import { alive } from '../sim/battle';
 import { DOCTRINES, RELOAD_BASE, SAILNAMES } from '../sim/constants';
+import { GOODS, cargoLoad, fleetCargoCap } from '../sim/economy';
+import { FACTIONS } from '../sim/worldgen';
 import { clamp } from '../sim/math';
+import type { RunState } from '../sim/types';
 import { audio } from '../audio';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -156,10 +159,9 @@ export class Hud {
     });
   }
 
-  /** DOM edge arrows pointing at enemies outside the view. */
-  syncOffscreen(battle: Battle, camera: THREE.PerspectiveCamera): void {
-    const enemies = battle.living('e');
-    while (this.arrowPool.length < enemies.length) {
+  /** DOM edge arrows pointing at things outside the view. */
+  syncOffscreen(camera: THREE.PerspectiveCamera, targets: { x: number; y: number; color: string }[]): void {
+    while (this.arrowPool.length < targets.length) {
       const el = document.createElement('div');
       el.style.cssText =
         'position:fixed;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;' +
@@ -171,11 +173,12 @@ export class Hud {
     const margin = 30;
     for (let i = 0; i < this.arrowPool.length; i++) {
       const el = this.arrowPool[i];
-      const e = enemies[i];
+      const e = targets[i];
       if (!e) {
         el.style.display = 'none';
         continue;
       }
+      el.style.borderBottomColor = e.color;
       v.set(e.x, 10, e.y).project(camera);
       const sx = (v.x * 0.5 + 0.5) * innerWidth;
       const sy = (-v.y * 0.5 + 0.5) * innerHeight;
@@ -205,4 +208,66 @@ export class Hud {
   hideArrows(): void {
     for (const el of this.arrowPool) el.style.display = 'none';
   }
+
+  /* ============ map mode ============ */
+
+  setMode(mode: 'battle' | 'map'): void {
+    const battle = mode === 'battle';
+    $('guns').style.display = battle ? 'flex' : 'none';
+    $('ammo').style.display = battle ? 'flex' : 'none';
+    $('fleet').style.display = battle ? 'flex' : 'none';
+    $('estat').style.display = battle ? 'flex' : 'none';
+    $('cargo').style.display = battle ? 'none' : 'block';
+    $('rep').style.display = battle ? 'none' : 'block';
+    if (!battle) $('boardbtn').style.display = 'none';
+    if (battle) $('dockbtn').style.display = 'none';
+    $('hint').textContent = battle
+      ? 'A/D steer · W/S sails · 1-3 shot · Q/E fire · F signal · G order · Tab take helm · B board · Esc menu'
+      : 'A/D steer · W/S sails · B make port · sail the gold mark to advance · Esc menu';
+  }
+
+  syncMap(world: WorldLike, run: RunState): void {
+    const p = world.player;
+    $('pname').textContent = 'Persistence';
+    $('ph').style.width = run.flag.hullPct * 100 + '%';
+    $('ps').style.width = run.flag.sailHP + '%';
+    $('pc').style.width = run.flag.crewPct * 100 + '%';
+    $('prud').textContent = this.rudderWord(run.flag.rudderHP);
+    $('prud').style.color = run.flag.rudderHP < 50 ? '#c4583a' : '';
+    $('sailset').textContent = SAILNAMES[p.sailIdx];
+    $('rosearrow').setAttribute(
+      'transform',
+      `rotate(${((world.wind.dir * 180) / Math.PI + 90).toFixed(1)} 27 27)`,
+    );
+    $('knots').textContent = (p.speed / 14).toFixed(1) + ' kn';
+    $('battleno').textContent =
+      run.battle <= 6 ? 'ACTION ' + run.battle + ' — SAIL TO THE GOLD MARK' : 'THE SEA IS YOURS';
+
+    const dock = $('dockbtn');
+    if (world.canDock) {
+      dock.style.display = 'block';
+      dock.textContent = '⚓ MAKE PORT — ' + world.canDock.name.toUpperCase() + ' (B)';
+    } else {
+      dock.style.display = 'none';
+    }
+
+    $('cargolist').innerHTML =
+      'STORES ' + run.stores + ' · HOLD ' + cargoLoad(run) + '/' + fleetCargoCap(run) + '<br>' +
+      GOODS.filter((g) => (run.cargo[g.key] || 0) > 0)
+        .map((g) => g.name + ' × ' + run.cargo[g.key])
+        .join(' · ') || '';
+
+    $('replist').innerHTML = FACTIONS.map((f) => {
+      const r = run.rep[f.key];
+      const word = r > 30 ? 'ally' : r > -20 ? 'wary' : r > -50 ? 'hostile' : 'shoot on sight';
+      return f.name + ': ' + r + ' (' + word + ')';
+    }).join('<br>');
+  }
+}
+
+/** the slice of World the HUD needs (avoids a sim import cycle) */
+interface WorldLike {
+  player: { sailIdx: number; speed: number };
+  wind: { dir: number };
+  canDock: { name: string } | null;
 }

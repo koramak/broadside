@@ -22,7 +22,7 @@ export class ShipView {
   private listDir: number;
 
   constructor(public ship: Ship, lib: ModelLibrary, modelOverride?: string) {
-    const name = modelOverride ?? shipModelName(ship.cls, ship.team);
+    const name = modelOverride ?? shipModelName(ship.cls, ship.team, ship.faction);
     const model = lib.instantiateShip(name, ship.len * 1.06);
     this.group.add(model.root);
 

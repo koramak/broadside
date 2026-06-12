@@ -50,6 +50,22 @@ button:disabled{opacity:.35;cursor:default}
 #sigbtn,#orderbtn{width:84px;height:30px;font-size:9px;letter-spacing:.04em}
 #sigbtn{border-color:var(--gold)}
 #boardbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
+#dockbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
+#cargo{bottom:96px;left:12px;display:none;z-index:5;min-width:170px}
+#cargo .sub{line-height:1.7}
+#rep{top:208px;left:12px;display:none;z-index:5;min-width:170px}
+#rep .sub{line-height:1.7}
+#port{position:fixed;inset:0;background:rgba(7,16,20,.93);display:none;align-items:center;justify-content:flex-start;flex-direction:column;gap:11px;text-align:center;padding:26px 16px;z-index:20;overflow-y:auto}
+#port h1{font-size:26px;font-weight:normal;letter-spacing:.12em}
+#pmeta{font-family:'Courier New',monospace;font-size:11px;color:var(--parch-dim)}
+#pstores2{font-family:'Courier New',monospace;font-size:12px;color:var(--gold)}
+#port .big{padding:11px 24px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.18)}
+.hcard.wide{width:472px;max-width:92vw}
+.mrow{display:flex;align-items:center;gap:6px;font-family:'Courier New',monospace;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(233,220,190,.08)}
+.mrow .mname{width:74px;text-align:left}
+.mrow .mprice{width:46px;color:var(--gold);text-align:right}
+.mrow .mqty{width:58px;color:var(--parch-dim);text-align:right}
+.mrow button{font-size:9px;padding:3px 7px;margin:0;width:auto;display:inline-block}
 #hint{bottom:84px;left:50%;transform:translateX(-50%);font-size:10px;font-family:'Courier New',monospace;color:var(--parch-dim);background:none;border:none;text-align:center;position:fixed;z-index:5}
 #overlay,#pausemenu,#harbor{position:fixed;inset:0;background:rgba(7,16,20,.92);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;text-align:center;padding:16px;z-index:20;overflow-y:auto}
 #overlay h1,#pausemenu h1,#harbor h1{font-size:26px;font-weight:normal;letter-spacing:.12em}

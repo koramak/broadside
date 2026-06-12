@@ -63,7 +63,17 @@
 </div>
 
 <button id="boardbtn">⚓ GRAPPLE &amp; BOARD</button>
+<button id="dockbtn">⚓ MAKE PORT (B)</button>
 <div class="panel" id="hint">A/D steer · W/S sails · 1-3 shot · Q/E fire · F signal · G order · Tab take helm · B board · Esc menu</div>
+
+<div class="panel" id="cargo">
+  <div class="lbl">Hold &amp; Ledger</div>
+  <div id="cargolist" class="sub">—</div>
+</div>
+<div class="panel" id="rep">
+  <div class="lbl">Standing</div>
+  <div id="replist" class="sub">—</div>
+</div>
 
 <div id="pausemenu">
   <h1>PAUSED</h1>
@@ -83,6 +93,20 @@
   <div class="hrow" id="hships"></div>
   <div class="hrow" id="hprizes"></div>
   <button class="big" id="hnext">—</button>
+</div>
+
+<div id="port">
+  <h1 id="ptitle">PORT</h1>
+  <div id="pmeta">—</div>
+  <div id="pstores2">—</div>
+  <div class="hrow">
+    <div class="hcard wide" id="pmarket"></div>
+  </div>
+  <div class="hrow">
+    <div class="hcard" id="pservices"></div>
+    <div class="hcard" id="ptavern"></div>
+  </div>
+  <button class="big" id="pleave">SET SAIL</button>
 </div>
 
 <div id="overlay">

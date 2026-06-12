@@ -1,4 +1,6 @@
 import type { Captain, DoctrineKey, RefitKey, ShipClass } from './constants';
+import type { GoodKey } from './economy';
+import type { FactionKey } from './worldgen';
 
 export type Team = 'p' | 'e';
 
@@ -36,6 +38,8 @@ export interface Ship {
   evadeDir: number;
   wakeT: number;
   dead: boolean;
+  /** which flag she flies — drives livery and reputation consequences */
+  faction?: FactionKey;
 }
 
 export interface Ball {
@@ -103,4 +107,6 @@ export interface RunState {
   armada: ArmadaEntry[];
   pendingPrizes: Prize[];
   stats: { prizes: number; sunk: number };
+  cargo: Record<GoodKey, number>;
+  rep: Record<FactionKey, number>;
 }

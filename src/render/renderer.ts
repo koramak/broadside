@@ -114,6 +114,12 @@ export class SceneShell {
     this.renderer.setSize(innerWidth, innerHeight);
   }
 
+  /** Jump the camera target instantly (run start, battle handoff). */
+  snapTo(x: number, y: number): void {
+    this.camTarget.set(x, 0, y);
+    this.follow(x, y, 0);
+  }
+
   /** Smoothly follow a sim-space point (sim x,y → world x,z). */
   follow(x: number, y: number, dt: number): void {
     const k = 1 - Math.exp(-dt * 3.2);

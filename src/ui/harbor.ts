@@ -1,19 +1,28 @@
 // Harbor screen between actions: repairs, armada roster, prize decisions.
 // Ported from the prototype; logic lives in sim/run.ts, this is just DOM.
 
-import { CLASSES, ESCALATION, STRIP_LOOT, CREW_COST, PRIZE_VALUE } from '../sim/constants';
+import { CLASSES, STRIP_LOOT, CREW_COST, PRIZE_VALUE } from '../sim/constants';
 import * as runOps from '../sim/run';
 import type { RunState } from '../sim/types';
 import { Rng } from '../sim/rng';
 import { audio } from '../audio';
 import { $ } from './hud';
 
+export interface HarborOpts {
+  title: string;
+  nextLabel: string;
+  /** at sea: no repairs, no hiring — just prizes, crew, and the ledger */
+  atSea: boolean;
+}
+
 export class HarborScreen {
   onSetSail: () => void = () => {};
+  private opts: HarborOpts = { title: 'BETWEEN ACTIONS', nextLabel: 'SET SAIL', atSea: false };
 
-  show(run: RunState, rng: Rng): void {
+  show(run: RunState, rng: Rng, opts: HarborOpts): void {
+    this.opts = opts;
     $('harbor').style.display = 'flex';
-    $('htitle').textContent = 'ACTION ' + run.battle + ' WON';
+    $('htitle').textContent = opts.title;
     this.render(run, rng);
   }
 
@@ -55,10 +64,12 @@ export class HarborScreen {
       return b;
     };
 
-    fcard.appendChild(mk('REPAIR HULL +35%', 12, () => runOps.repairHull(run), f.hullPct >= 1));
-    fcard.appendChild(mk('MEND SAILS to full', 8, () => runOps.mendSails(run), f.sailHP >= 100));
-    fcard.appendChild(mk('REMOUNT GUNS & RUDDER', 8, () => runOps.remountGuns(run), f.gunDef[0] + f.gunDef[1] === 0 && f.rudderHP >= 100));
-    fcard.appendChild(mk('HIRE 10 HANDS to the pool', 10, () => runOps.hireHands(run), false));
+    if (!this.opts.atSea) {
+      fcard.appendChild(mk('REPAIR HULL +35%', 12, () => runOps.repairHull(run), f.hullPct >= 1));
+      fcard.appendChild(mk('MEND SAILS to full', 8, () => runOps.mendSails(run), f.sailHP >= 100));
+      fcard.appendChild(mk('REMOUNT GUNS & RUDDER', 8, () => runOps.remountGuns(run), f.gunDef[0] + f.gunDef[1] === 0 && f.rudderHP >= 100));
+      fcard.appendChild(mk('HIRE 10 HANDS to the pool', 10, () => runOps.hireHands(run), false));
+    }
     fcard.appendChild(mk('TOP UP CREW from pool (free)', 0, () => runOps.topUpCrew(run), f.crewPct >= 1 || run.pool <= 0));
     ships$.appendChild(fcard);
 
@@ -119,7 +130,7 @@ export class HarborScreen {
       pz.appendChild(card);
     });
 
-    $('hnext').textContent = 'SET SAIL — ACTION ' + (run.battle + 1) + ': ' + ESCALATION[run.battle].desc.toUpperCase();
+    $('hnext').textContent = this.opts.nextLabel;
   }
 
   bind(): void {

@@ -2,11 +2,13 @@
 // Deterministic: all randomness flows through the injected Rng. No DOM, no Three.js.
 
 import {
-  AMMO, ARC, ARENA_R, BALL_SPD, CAPTAINS, CLASSES, DOCTRINES, ESCALATION,
-  GUN_RANGE, RELOAD_BASE, SAILS, SHIP_NAMES,
+  AMMO, ARC, ARENA_R, BALL_SPD, CAPTAINS, CLASSES, DOCTRINES,
+  GUN_RANGE, RELOAD_BASE, SHIP_NAMES,
 } from './constants';
 import type { Captain, ShipClass } from './constants';
-import { clamp, dist, lerp, normAng, TAU } from './math';
+import type { FactionKey } from './worldgen';
+import { clamp, dist, normAng, TAU } from './math';
+import { stepShipPhysics, windEff } from './physics';
 import { EventQueue } from './events';
 import { Rng } from './rng';
 import type {
@@ -18,6 +20,16 @@ import { flagStats } from './run';
 export type BattleOutcome =
   | { result: 'won'; salvage: number; pressed: number }
   | { result: 'lost' };
+
+/** What the player is fighting and why — built by the world map (or, for
+ *  story actions, straight from the locked ESCALATION table). */
+export interface BattleSpec {
+  ships: ShipClass[];
+  desc: string;
+  faction?: FactionKey;
+  plate?: boolean;
+  story?: number;
+}
 
 export function makeShip(
   cls: ShipClass,
@@ -67,7 +79,7 @@ export class Battle {
   private endOutcome: BattleOutcome | null = null;
   outcome: BattleOutcome | null = null;
 
-  constructor(run: RunState, seed: number) {
+  constructor(run: RunState, seed: number, spec: BattleSpec) {
     this.rng = new Rng(seed);
     const rng = this.rng;
     this.wind = { dir: rng.rnd(TAU), drift: rng.rnd(-0.012, 0.012) };
@@ -104,10 +116,9 @@ export class Battle {
       this.ships.push(s);
     });
 
-    // enemies from escalation
-    const wave = ESCALATION[run.battle - 1];
+    // enemies from the encounter spec
     const a0 = rng.rnd(TAU);
-    wave.ships.forEach((ecls, i) => {
+    spec.ships.forEach((ecls, i) => {
       const e = makeShip(
         ecls, 'e',
         Math.cos(a0) * 680 + rng.rnd(-120, 120),
@@ -117,11 +128,14 @@ export class Battle {
       const cap: Captain = caps.pop() || ['Vane', 'bulldog'];
       e.captain = cap;
       e.doctrine = cap[1];
-      e.name = (run.battle === 6 && i === 0) ? 'THE PLATE SHIP' : CLASSES[ecls].name + ' ' + shipName();
+      e.faction = spec.faction;
+      e.name = (spec.plate && i === 0) ? 'THE PLATE SHIP' : CLASSES[ecls].name + ' ' + shipName();
       this.ships.push(e);
     });
 
-    this.events.feed('Action ' + run.battle + ': ' + wave.desc);
+    this.events.feed(
+      spec.story ? 'Action ' + spec.story + ': ' + spec.desc : 'To quarters — ' + spec.desc,
+    );
   }
 
   P(): Ship {
@@ -154,22 +168,7 @@ export class Battle {
   /* ============ sailing ============ */
 
   windEff(heading: number): number {
-    const off = Math.abs(normAng(heading - this.wind.dir));
-    const pts: [number, number][] = [
-      [0, 0.80], [Math.PI * 0.25, 0.95], [Math.PI * 0.5, 1.0],
-      [Math.PI * 0.75, 0.45], [2.95, 0.08], [Math.PI, 0.05],
-    ];
-    for (let i = 0; i < pts.length - 1; i++) {
-      if (off <= pts[i + 1][0]) {
-        const t = (off - pts[i][0]) / (pts[i + 1][0] - pts[i][0]);
-        return lerp(pts[i][1], pts[i + 1][1], t);
-      }
-    }
-    return 0.05;
-  }
-
-  private rudderFac(s: Ship): number {
-    return s.rudderHP <= 0 ? 0.3 : s.rudderHP < 50 ? 0.7 : 1;
+    return windEff(heading, this.wind.dir);
   }
 
   private updateShip(s: Ship, dt: number): void {
@@ -191,13 +190,7 @@ export class Battle {
       s.y += Math.sin(s.heading) * s.speed * dt;
       return;
     }
-    const spdFac = clamp(s.speed / s.maxSpd, 0, 1);
-    s.heading = normAng(s.heading + s.rudder * s.turn * this.rudderFac(s) * (0.35 + 0.65 * spdFac) * dt);
-    const tgt = s.maxSpd * SAILS[s.sailIdx] * this.windEff(s.heading) * (0.3 + 0.7 * s.sailHP / 100);
-    const rate = tgt > s.speed ? 0.55 : 1.1;
-    s.speed += (tgt - s.speed) * clamp(dt * rate, 0, 1);
-    s.x += Math.cos(s.heading) * s.speed * dt;
-    s.y += Math.sin(s.heading) * s.speed * dt;
+    stepShipPhysics(s, this.wind.dir, dt);
     const d = Math.hypot(s.x, s.y);
     if (d > ARENA_R) {
       const k = (d - ARENA_R) / d;

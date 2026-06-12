@@ -107,10 +107,13 @@ export const SHIP_MODEL_NAMES = [
 export const PROP_MODEL_NAMES = [
   'rocks-a', 'rocks-b', 'rocks-c', 'palm-bend', 'palm-straight',
   'tower-complete-small', 'structure-platform-dock', 'barrel', 'crate', 'chest',
+  'flag-high-pennant', 'flag-pirate-high',
 ];
 
-/** sim class + team → kit model. Player sails the black flags. */
-export function shipModelName(cls: string, team: string): string {
+/** sim class + team/faction → kit model. The player and the Brethren sail the
+ *  black flags; Crown and Compañía fly clean canvas. */
+export function shipModelName(cls: string, team: string, faction?: string): string {
   const size = cls === 'sloop' ? 'small' : cls === 'brig' ? 'medium' : 'large';
-  return team === 'p' ? `ship-pirate-${size}` : `ship-${size}`;
+  if (team === 'p' || faction === 'brethren') return `ship-pirate-${size}`;
+  return `ship-${size}`;
 }

@@ -1,37 +1,49 @@
 // BROADSIDE — game shell. Owns the fixed-timestep loop and the
-// battle → harbor → battle flow. Sim is deterministic and renderer-free;
+// map ⇄ battle ⇄ port flow. The sim is deterministic and renderer-free;
 // this file is the only place the two meet.
 
 import './ui/ui.css';
 import { Battle } from './sim/battle';
-import { ESCALATION, SIM_DT } from './sim/constants';
+import type { BattleSpec } from './sim/battle';
+import { SIM_DT } from './sim/constants';
 import { newRun } from './sim/run';
+import { clampCargo } from './sim/economy';
 import { Rng } from './sim/rng';
 import type { RunState } from './sim/types';
+import { World } from './sim/world';
+import type { EncounterSpec } from './sim/world';
 import { SceneShell } from './render/renderer';
 import { ShipView } from './render/shipView';
 import { Effects } from './render/effects';
+import { ModelLibrary, PROP_MODEL_NAMES, SHIP_MODEL_NAMES } from './render/models';
+import { WorldView } from './render/worldView';
 import { Hud, $ } from './ui/hud';
 import { HarborScreen } from './ui/harbor';
+import { PortScreen } from './ui/port';
 import { Input } from './input/input';
 import { audio, boom } from './audio';
-
-import { ModelLibrary, PROP_MODEL_NAMES, SHIP_MODEL_NAMES } from './render/models';
+import { STORY_ACTIONS } from './sim/worldgen';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const shell = new SceneShell(canvas);
 const effects = new Effects(shell.scene);
 const hud = new Hud();
 const harbor = new HarborScreen();
+const portScreen = new PortScreen();
 const lib = new ModelLibrary();
+let worldView: WorldView | null = null;
+
+type Mode = 'map' | 'battle' | 'aftermath' | 'port' | 'over';
 
 let run: RunState = newRun();
-// master RNG seeds each battle; reseeded per run so runs differ
 let masterRng = new Rng(Date.now() >>> 0);
+let world: World | null = null;
+let playerMapView: ShipView | null = null;
 let battle: Battle | null = null;
+let currentEnc: EncounterSpec | null = null;
 let shipViews: ShipView[] = [];
 let paused = false;
-let mode: 'battle' | 'harbor' | 'over' = 'battle';
+let mode: Mode = 'map';
 
 function setPaused(v: boolean): void {
   if (v && battle && battle.phase === 'end') return;
@@ -39,33 +51,67 @@ function setPaused(v: boolean): void {
   $('pausemenu').style.display = v ? 'flex' : 'none';
 }
 
-function startBattle(): void {
-  // tear down old views
+/* ============ mode transitions ============ */
+
+function enterMap(): void {
+  mode = 'map';
+  hud.setMode('map');
+  harbor.hide();
+  portScreen.hide();
+  $('overlay').style.display = 'none';
+  worldView?.setVisible(true);
+  if (world) {
+    world.syncPlayerFromRun(run);
+    if (playerMapView) playerMapView.group.visible = true;
+    shell.snapTo(world.player.x, world.player.y);
+  }
+  hud.hideArrows();
+}
+
+function startBattle(spec: BattleSpec): void {
   for (const sv of shipViews) sv.dispose(shell.scene);
   shipViews = [];
   effects.clearTransient();
 
-  battle = new Battle(run, masterRng.int(2 ** 31));
+  battle = new Battle(run, masterRng.int(2 ** 31), spec);
   for (const s of battle.ships) {
     const sv = new ShipView(s, lib);
     shell.scene.add(sv.group);
     shipViews.push(sv);
   }
+  shell.snapTo(battle.P().x, battle.P().y);
   hud.clearFeed();
+  hud.setMode('battle');
   hud.applyHelmUI(battle);
   hud.syncOrderBtn(battle);
-  hud.setBattleNo(run.battle, ESCALATION.length);
-  harbor.hide();
-  $('overlay').style.display = 'none';
+  $('battleno').textContent = spec.story ? 'ACTION ' + spec.story + ' OF 6' : 'ENGAGEMENT';
+  worldView?.setVisible(false);
+  if (playerMapView) playerMapView.group.visible = false;
   mode = 'battle';
   setPaused(false);
+}
+
+function endBattleCleanup(): void {
+  for (const sv of shipViews) sv.dispose(shell.scene);
+  shipViews = [];
+  effects.clearTransient();
+  battle = null;
 }
 
 function startRun(): void {
   run = newRun();
   masterRng = new Rng(Date.now() >>> 0);
-  $('overlay').style.display = 'none';
-  startBattle();
+  world = new World(run, masterRng.int(2 ** 31));
+  worldView?.clearDynamic();
+  if (playerMapView) playerMapView.dispose(shell.scene);
+  playerMapView = new ShipView(world.player, lib);
+  shell.scene.add(playerMapView.group);
+  endBattleCleanup();
+  hud.clearFeed();
+  hud.feed('The Plate Fleet is forming up somewhere east. Your chart marks the first of six actions.');
+  hud.feed('Wind, guns, and arithmetic. Everything else is decoration.');
+  shell.snapTo(world.player.x, world.player.y);
+  enterMap();
 }
 
 function showRunOver(title: string, text: string): void {
@@ -81,7 +127,8 @@ function showVictory(): void {
   mode = 'over';
   $('otitle').textContent = 'THE PLATE SHIP IS YOURS';
   $('otext').textContent =
-    'Six actions, and the richest hull on the sea strikes to you. The run is complete.';
+    'Six actions, and the richest hull on the sea strikes to you. ' +
+    'Beyond the Tessellate the Mist is still standing there, pretending not to watch. The run is complete — for now.';
   $('runstats').textContent =
     'Prizes: ' + run.stats.prizes + ' · Sunk: ' + run.stats.sunk + ' · Stores: ' + run.stores;
   $('overlay').style.display = 'flex';
@@ -91,50 +138,82 @@ function showVictory(): void {
 
 const input = new Input({
   setAmmo: (i) => {
-    if (battle && !paused) {
+    if (mode === 'battle' && battle && !paused) {
       battle.setAmmo(i);
       hud.setAmmoUI(i);
     }
   },
   fire: (side) => {
-    if (battle && !paused) battle.fire(battle.P(), side);
+    if (mode === 'battle' && battle && !paused) battle.fire(battle.P(), side);
   },
   sailUp: () => {
-    if (battle && !paused) battle.setSail(battle.P().sailIdx + 1);
+    if (paused) return;
+    if (mode === 'battle' && battle) battle.setSail(battle.P().sailIdx + 1);
+    if (mode === 'map' && world) world.player.sailIdx = Math.min(2, world.player.sailIdx + 1);
   },
   sailDown: () => {
-    if (battle && !paused) battle.setSail(battle.P().sailIdx - 1);
+    if (paused) return;
+    if (mode === 'battle' && battle) battle.setSail(battle.P().sailIdx - 1);
+    if (mode === 'map' && world) world.player.sailIdx = Math.max(0, world.player.sailIdx - 1);
   },
   signal: () => {
-    if (battle && !paused) battle.signal();
+    if (mode === 'battle' && battle && !paused) battle.signal();
   },
   toggleOrder: () => {
-    if (battle && !paused) {
+    if (mode === 'battle' && battle && !paused) {
       battle.toggleOrder();
       hud.syncOrderBtn(battle);
     }
   },
   board: () => {
-    if (battle && !paused) battle.startBoarding();
+    if (paused) return;
+    if (mode === 'battle' && battle) battle.startBoarding();
+    if (mode === 'map' && world && world.canDock) {
+      mode = 'port';
+      portScreen.show(world.canDock, run, world.day);
+    }
   },
   nextHelm: () => {
-    if (battle && !paused) {
+    if (mode === 'battle' && battle && !paused) {
       battle.nextHelm();
       hud.applyHelmUI(battle);
     }
   },
-  togglePause: () => setPaused(!paused),
+  togglePause: () => {
+    if (mode === 'battle' || mode === 'map') setPaused(!paused);
+  },
 });
 
 hud.onTakeHelm = (idx) => {
-  if (battle && !paused && battle.takeHelm(idx)) hud.applyHelmUI(battle);
+  if (mode === 'battle' && battle && !paused && battle.takeHelm(idx)) hud.applyHelmUI(battle);
 };
 
 harbor.bind();
 harbor.onSetSail = () => {
-  run.battle++;
-  startBattle();
+  // aftermath dismissed — back to the chart
+  if (currentEnc && currentEnc.story === 6) {
+    showVictory();
+    return;
+  }
+  currentEnc = null;
+  enterMap();
 };
+
+portScreen.bind();
+portScreen.onLeave = () => {
+  enterMap();
+};
+portScreen.onShipChanged = () => {
+  if (world) world.syncPlayerFromRun(run);
+};
+
+$('dockbtn').addEventListener('click', () => {
+  audio();
+  if (mode === 'map' && world && world.canDock && !paused) {
+    mode = 'port';
+    portScreen.show(world.canDock, run, world.day);
+  }
+});
 
 $('orestart').addEventListener('click', () => {
   audio();
@@ -144,17 +223,42 @@ $('presume').addEventListener('click', () => setPaused(false));
 $('pabandon').addEventListener('click', () => {
   audio();
   setPaused(false);
-  showRunOver('RUN ABANDONED', 'You turn for home with what you have.');
+  showRunOver('RUN ABANDONED', 'You turn for home with what you have. The sea shrugs.');
 });
+
+/* ============ outcome handling ============ */
+
+function handleBattleOutcome(): void {
+  if (!battle || !battle.outcome) return;
+  const out = battle.outcome;
+  battle.outcome = null;
+  if (out.result === 'won') {
+    const enc = currentEnc;
+    if (world && enc) world.applyVictory(run, enc);
+    const lost = clampCargo(run);
+    if (lost > 0) hud.feed(lost + ' cargo went down with the hull that carried it.');
+    endBattleCleanup();
+    mode = 'aftermath';
+    hud.hideArrows();
+    harbor.show(run, masterRng, {
+      title: enc && enc.story ? 'ACTION ' + enc.story + ' WON' : 'THE RECKONING',
+      nextLabel: enc && enc.story === 6 ? 'CLAIM YOUR LEGEND' : 'BACK TO THE CHART',
+      atSea: true,
+    });
+  } else {
+    showRunOver(
+      'THE RUN ENDS',
+      'Every ship under your flag is sunk, struck, or taken. The Plate Ship sails on without you, heavier by exactly one lesson.',
+    );
+  }
+}
 
 /* ============ main loop ============ */
 
 let last = performance.now();
 let acc = 0;
 let simTime = 0;
-/** Test hook: when true the main loop renders but never steps the sim. */
 let freeze = false;
-
 let frameCount = 0;
 
 function frame(now: number): void {
@@ -162,38 +266,41 @@ function frame(now: number): void {
   last = now;
   frameCount++;
 
-  if (battle && mode === 'battle' && !paused && !freeze) {
+  if (!paused && !freeze) {
     acc += dtReal;
     while (acc >= SIM_DT) {
       acc -= SIM_DT;
-      battle.playerRudder = input.rudder();
-      battle.step(SIM_DT, run);
       simTime += SIM_DT;
+      if (mode === 'battle' && battle) {
+        battle.playerRudder = input.rudder();
+        battle.step(SIM_DT, run);
+      } else if (mode === 'map' && world) {
+        world.playerRudder = input.rudder();
+        world.step(SIM_DT, run);
+      }
     }
 
-    // outcome?
-    if (battle.outcome) {
-      const out = battle.outcome;
-      battle.outcome = null;
-      if (out.result === 'won') {
-        if (run.battle >= 6) showVictory();
-        else {
-          mode = 'harbor';
-          hud.hideArrows();
-          harbor.show(run, masterRng);
-        }
-      } else {
-        showRunOver(
-          'THE RUN ENDS',
-          'Every ship under your flag is sunk, struck, or taken. The Plate Ship sails on without you.',
-        );
-      }
+    if (mode === 'battle') handleBattleOutcome();
+
+    if (mode === 'map' && world && world.pendingEncounter) {
+      currentEnc = world.pendingEncounter;
+      world.pendingEncounter = null;
+      startBattle({
+        ships: currentEnc.ships,
+        desc: currentEnc.desc,
+        faction: currentEnc.faction,
+        plate: currentEnc.plate,
+        story: currentEnc.story,
+      });
     }
   }
 
   // drain sim events → feed, audio, effects
-  if (battle) {
-    for (const e of battle.events.drain()) {
+  const queues = [];
+  if (battle) queues.push(battle.events);
+  if (world && mode === 'map') queues.push(world.events);
+  for (const q of queues) {
+    for (const e of q.drain()) {
       switch (e.kind) {
         case 'feed':
           hud.feed(e.msg);
@@ -220,16 +327,34 @@ function frame(now: number): void {
   }
 
   // render
-  if (battle) {
+  if (mode === 'battle' && battle) {
     const p = battle.P();
     shell.follow(p.x, p.y, dtReal);
-    shell.updateEnvironment(simTime, battle.wind.dir, paused || mode !== 'battle');
+    shell.updateEnvironment(simTime, battle.wind.dir, paused);
     for (const sv of shipViews) sv.update(sv.ship === p, simTime);
     effects.syncBalls(battle.balls, simTime);
     effects.update(paused ? 0 : dtReal);
-    if (mode === 'battle') {
-      hud.sync(battle, paused);
-      hud.syncOffscreen(battle, shell.camera);
+    hud.sync(battle, paused);
+    hud.syncOffscreen(
+      shell.camera,
+      battle.living('e').map((e) => ({ x: e.x, y: e.y, color: 'rgba(196,88,58,.85)' })),
+    );
+    if (!paused) hud.updateFeed(dtReal);
+  } else if ((mode === 'map' || mode === 'port' || mode === 'aftermath') && world) {
+    const p = world.player;
+    shell.follow(p.x, p.y, dtReal);
+    shell.updateEnvironment(simTime, world.wind.dir, paused || mode !== 'map');
+    playerMapView?.update(true, simTime);
+    worldView?.update(world, run, simTime);
+    effects.update(paused || mode !== 'map' ? 0 : dtReal);
+    if (mode === 'map') {
+      hud.syncMap(world, run);
+      const targets: { x: number; y: number; color: string }[] = [];
+      if (run.battle <= 6) {
+        const m = STORY_ACTIONS[run.battle - 1];
+        targets.push({ x: m.x, y: m.y, color: 'rgba(217,164,65,.9)' });
+      }
+      hud.syncOffscreen(shell.camera, targets);
       if (!paused) hud.updateFeed(dtReal);
     }
   }
@@ -238,35 +363,20 @@ function frame(now: number): void {
 }
 
 // Preload kit models, dress the set, then raise the curtain.
-void (async () => {
+(async () => {
   await lib.preload([...SHIP_MODEL_NAMES, ...PROP_MODEL_NAMES]);
-  // scatter islets just beyond the arena ring — set dressing, no collision
-  const scatterRng = (n: number) => {
-    const x = Math.sin(n * 127.1) * 43758.5453;
-    return x - Math.floor(x);
-  };
-  for (let i = 0; i < 14; i++) {
-    const a = scatterRng(i) * Math.PI * 2;
-    const r = 1700 + 160 + scatterRng(i + 50) * 420;
-    const rock = lib.instantiateProp(
-      ['rocks-a', 'rocks-b', 'rocks-c'][i % 3],
-      26 + scatterRng(i + 100) * 30,
-    );
-    rock.position.set(Math.cos(a) * r, -2, Math.sin(a) * r);
-    rock.rotation.y = scatterRng(i + 150) * Math.PI * 2;
-    shell.scene.add(rock);
-    if (i % 4 === 0) {
-      const palm = lib.instantiateProp(i % 8 === 0 ? 'palm-bend' : 'palm-straight', 20);
-      palm.position.set(Math.cos(a) * r, 4, Math.sin(a) * r);
-      palm.rotation.y = scatterRng(i + 200) * Math.PI * 2;
-      shell.scene.add(palm);
-    }
-  }
+  worldView = new WorldView(shell.scene, lib);
   startRun();
   requestAnimationFrame(frame);
-})();
+})().catch((err) => {
+  console.error('BROADSIDE failed to start:', err);
+  $('otitle').textContent = 'RIGGING FAILURE';
+  $('otext').textContent = 'The game could not load its assets: ' + String(err);
+  $('overlay').style.display = 'flex';
+});
 
-// Dev/debug handle for automated verification (harmless in production).
+/* ============ debug handle (used by automated verification) ============ */
+
 declare global {
   interface Window {
     __broadside?: unknown;
@@ -276,25 +386,35 @@ window.__broadside = {
   get battle() {
     return battle;
   },
+  get world() {
+    return world;
+  },
   get run() {
     return run;
   },
   get mode() {
     return mode;
   },
+  set mode(m: Mode) {
+    mode = m;
+  },
   stepMany(n: number) {
     if (!battle || mode !== 'battle') return;
     for (let i = 0; i < n && !battle.outcome; i++) battle.step(SIM_DT, run);
   },
-  setSail: () => harbor.onSetSail(),
+  stepMap(n: number) {
+    if (!world || mode !== 'map') return;
+    for (let i = 0; i < n; i++) {
+      world.step(SIM_DT, run);
+      if (world.pendingEncounter) break;
+    }
+  },
   freeze(v: boolean) {
     freeze = v;
   },
-  nextBattle() {
-    run.battle++;
-    startBattle();
-  },
   startRun,
+  enterMap,
+  handleBattleOutcome,
   get frames() {
     return frameCount;
   },
