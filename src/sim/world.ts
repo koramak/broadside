@@ -17,6 +17,7 @@ import {
 } from './worldgen';
 import type { ContactSpec, FactionKey, PortDef } from './worldgen';
 import { currentObjective, objectivePos, onStoryWon, tutorialActive } from './objectives';
+import { EASY } from './easing';
 import type { GoodKey } from './economy';
 
 export interface Contact {
@@ -78,6 +79,7 @@ export class World {
   /** set each step: port you could dock at, encounter you just triggered */
   canDock: PortDef | null = null;
   pendingEncounter: EncounterSpec | null = null;
+  private carpenterBusy = false;
 
   constructor(run: RunState, seed: number) {
     this.rng = new Rng(seed);
@@ -207,7 +209,7 @@ export class World {
     // hard-clamped so the course to the current objective is never worse
     // than a broad reach (~0.7 efficiency). Battle wind stays honest.
     const obj = currentObjective(run);
-    if (obj && tutorialActive(run)) {
+    if (EASY.on && obj && tutorialActive(run)) {
       const t = objectivePos(obj);
       const bearing = Math.atan2(t.y - this.player.y, t.x - this.player.x);
       const a = normAng(bearing + Math.PI / 2);
@@ -217,7 +219,7 @@ export class World {
       this.wind.dir = normAng(this.wind.dir + clampDrift(err, 0.12 * dt));
     } else {
       this.wind.dir = normAng(this.wind.dir + this.wind.drift * dt);
-      if (obj) {
+      if (EASY.on && obj) {
         // never let the objective sit upwind: keep the bearing within 2.0 rad
         // of downwind (point-of-sail eff ≥ ~0.7 on the locked curve)
         const t = objectivePos(obj);
@@ -239,6 +241,18 @@ export class World {
     const p = this.player;
     p.rudder = this.playerRudder;
     stepShipPhysics(p, this.wind.dir, dt);
+    // the carpenter's crew fothers the worst leaks while you sail (testing
+    // mercy, EASY-gated): free patching, but never above carpenterCap
+    if (EASY.on && run.flag.hullPct < EASY.carpenterCap) {
+      if (!this.carpenterBusy) {
+        this.carpenterBusy = true;
+        this.events.feed('The carpenter takes a crew below — she’ll float to port, captain');
+      }
+      run.flag.hullPct = Math.min(EASY.carpenterCap, run.flag.hullPct + EASY.carpenterRate * dt);
+      this.player.hull = Math.max(8, Math.round(this.player.maxHull * run.flag.hullPct));
+    } else if (this.carpenterBusy && run.flag.hullPct >= EASY.carpenterCap) {
+      this.carpenterBusy = false;
+    }
     this.collideIslands(p);
     // world bounds + the Mist
     const hw = WORLD.width / 2;

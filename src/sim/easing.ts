@@ -24,4 +24,9 @@ export const EASY = {
 
   /** opening purse (was 20) */
   startingStores: 30,
+
+  /** the carpenter's crew: free at-sea hull patching, up to this fraction */
+  carpenterCap: 0.35,
+  /** hull fraction restored per second of map sailing */
+  carpenterRate: 0.005,
 };

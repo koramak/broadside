@@ -45,9 +45,20 @@ Primary asset source: Kenney Pirate Kit (kenney.nl/assets/pirate-kit) — 70 3D 
 
 - Combat dials pending playtests: ball speed 220/270/360, reload 4.5/5.5/7, rake full/reduced.
   (Dials are now live in the pause menu; defaults remain the locked values.)
-- Boarding: two competing prototypes exist (/reference/broadside-boarding-test-2.html real-time streams, /reference/broadside-boarding-test-3.html turn-based grid). The 2026-06-12 goal directive ("boarding must not feel like a pause") was read as picking the real-time direction, and a compact real-time deck fight (src/sim/boarding.ts) replaced the auto-resolve. HUMAN VERDICT STILL WELCOME — the grid prototype remains in reference/ and the sim module is swappable.
+- Boarding: two competing prototypes exist (/reference/broadside-boarding-test-2.html real-time streams, /reference/broadside-boarding-test-3.html turn-based grid). The 2026-06-12 goal directive ("boarding must not feel like a pause") was read as picking the real-time direction, and a compact real-time deck fight (src/sim/boarding.ts) replaced the auto-resolve. HUMAN VERDICT 2026-06-12: current implementation is not good enough ("boarding sucks") — boarding rework is the agreed NEXT work item. The real-time direction wasn't rejected, the execution was. Grid prototype remains a candidate.
 - Rare-ship rule-break taxonomy: designed in conversation with the human, not in code. (One enemy-only rule-breaker shipped as the late-game antagonist: the Drowned ignore the point-of-sail curve. Player-ownable rule-breakers remain undesigned, as agreed.)
 - Title: BROADSIDE is a placeholder.
+
+## Playtest easing (2026-06-12 directive)
+
+Testing-phase difficulty lives behind one switch: src/sim/easing.ts (EASY.on),
+exposed in the pause menu as FAIR WINDS & MERCY. While on: player damage ×0.8
+(gunnery + boarding), prize hands ×0.66 with stores covering shortfalls 1:1,
+pressed hands 45% + auto-muster after victories, repair +50% for 8, starting
+stores 30, map wind never against the current objective, carpenter trickle-
+repairs hull to 35% at sea. Locked constants in constants.ts are untouched;
+flipping EASY.on off restores prototype-true balance. Sweeps (furled = slow
+rowing) and accel rates 0.7/1.4 are PERMANENT feel changes, outside the gate.
 
 ## Current state (2026-06-12, autonomous build session)
 

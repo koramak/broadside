@@ -255,6 +255,7 @@ $('dockbtn').addEventListener('click', () => {
 
 // playtest dials (pause menu) — explicit tester action, defaults stay canon
 import { TUNING, setRake } from './sim/tuning';
+import { EASY } from './sim/easing';
 document.querySelectorAll<HTMLButtonElement>('[data-dial]').forEach((b) => {
   b.addEventListener('click', () => {
     audio();
@@ -263,6 +264,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-dial]').forEach((b) => {
     if (dial === 'ball') TUNING.ballSpd = Number(v);
     if (dial === 'reload') TUNING.reloadBase = Number(v);
     if (dial === 'rake') setRake(v as 'full' | 'reduced');
+    if (dial === 'easy') EASY.on = v === 'on';
     document
       .querySelectorAll<HTMLButtonElement>(`[data-dial="${dial}"]`)
       .forEach((x) => x.classList.toggle('on', x === b));
