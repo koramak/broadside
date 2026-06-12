@@ -68,6 +68,8 @@ button:disabled{opacity:.35;cursor:default}
 #cargo .sub{line-height:1.7}
 #rep{top:208px;left:12px;display:none;z-index:5;min-width:170px}
 #rep .sub{line-height:1.7}
+#minimap{bottom:14px;right:12px;display:none;z-index:5}
+#minimap canvas{display:block;margin-top:4px;background:rgba(11,27,34,.5);border:1px solid rgba(233,220,190,.14);border-radius:4px}
 #port{position:fixed;inset:0;background:rgba(7,16,20,.93);display:none;align-items:center;justify-content:flex-start;flex-direction:column;gap:11px;text-align:center;padding:26px 16px;z-index:20;overflow-y:auto}
 #port h1{font-size:26px;font-weight:normal;letter-spacing:.12em}
 #pmeta{font-family:'Courier New',monospace;font-size:11px;color:var(--parch-dim)}

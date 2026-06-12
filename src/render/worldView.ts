@@ -3,7 +3,9 @@
 
 import * as THREE from 'three';
 import type { World } from '../sim/world';
-import { ISLANDS, PORTS, STORY_ACTIONS, WORLD } from '../sim/worldgen';
+import { ISLANDS, PORTS, WORLD } from '../sim/worldgen';
+import { currentObjective, objectivePos } from '../sim/objectives';
+import type { RunState } from '../sim/types';
 import { ShipView } from './shipView';
 import { ModelLibrary } from './models';
 import { TAU } from '../sim/math';
@@ -96,10 +98,11 @@ export class WorldView {
     this.group.add(this.mist);
   }
 
-  update(world: World, run: { battle: number }, time: number): void {
-    // story marker follows current action
-    if (run.battle <= STORY_ACTIONS.length) {
-      const m = STORY_ACTIONS[run.battle - 1];
+  update(world: World, run: RunState, time: number): void {
+    // gold marker follows the current objective — a fight mark or a port call
+    const obj = currentObjective(run);
+    if (obj) {
+      const m = objectivePos(obj);
       this.marker.visible = true;
       this.marker.position.set(m.x, 0, m.y);
       const pulse = 1 + Math.sin(time * 2.4) * 0.06;

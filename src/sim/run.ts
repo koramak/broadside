@@ -10,6 +10,7 @@ import type { RunState } from './types';
 export function newRun(): RunState {
   return {
     battle: 1,
+    objIdx: 0,
     stores: 20,
     pool: 0,
     up: { canvas: 0, guns: 0, timbers: 0 },

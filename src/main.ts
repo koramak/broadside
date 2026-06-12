@@ -21,8 +21,9 @@ import { Hud, $ } from './ui/hud';
 import { HarborScreen } from './ui/harbor';
 import { PortScreen } from './ui/port';
 import { Input } from './input/input';
+import { Minimap } from './ui/minimap';
 import { audio, boom } from './audio';
-import { STORY_ACTIONS } from './sim/worldgen';
+import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const shell = new SceneShell(canvas);
@@ -32,6 +33,7 @@ const harbor = new HarborScreen();
 const portScreen = new PortScreen();
 const lib = new ModelLibrary();
 let worldView: WorldView | null = null;
+let minimap: Minimap | null = null;
 
 type Mode = 'map' | 'battle' | 'aftermath' | 'port' | 'over';
 
@@ -189,10 +191,7 @@ const input = new Input({
   board: () => {
     if (paused) return;
     if (mode === 'battle' && battle) battle.startBoarding();
-    if (mode === 'map' && world && world.canDock) {
-      mode = 'port';
-      portScreen.show(world.canDock, run, world.day);
-    }
+    if (mode === 'map' && world && world.canDock) enterPort(world.canDock);
   },
   nextHelm: () => {
     if (mode === 'battle' && battle && !paused) {
@@ -220,6 +219,7 @@ hud.onBoardPress = () => {
 
 harbor.bind();
 harbor.onSetSail = () => {
+  if (mode !== 'aftermath') return;
   // aftermath dismissed — back to the chart (or, after the Harrow, the end)
   if (currentEnc && currentEnc.story === 9) {
     showVictory();
@@ -242,12 +242,15 @@ portScreen.onShipChanged = () => {
   if (world) world.syncPlayerFromRun(run);
 };
 
+function enterPort(port: NonNullable<World['canDock']>): void {
+  mode = 'port';
+  if (world) onDocked(run, port.id, world.events);
+  portScreen.show(port, run, world ? world.day : 0);
+}
+
 $('dockbtn').addEventListener('click', () => {
   audio();
-  if (mode === 'map' && world && world.canDock && !paused) {
-    mode = 'port';
-    portScreen.show(world.canDock, run, world.day);
-  }
+  if (mode === 'map' && world && world.canDock && !paused) enterPort(world.canDock);
 });
 
 // playtest dials (pause menu) — explicit tester action, defaults stay canon
@@ -360,7 +363,7 @@ function frame(now: number): void {
   // drain sim events → feed, audio, effects
   const queues = [];
   if (battle) queues.push(battle.events);
-  if (world && mode === 'map') queues.push(world.events);
+  if (world && (mode === 'map' || mode === 'port' || mode === 'aftermath')) queues.push(world.events);
   for (const q of queues) {
     for (const e of q.drain()) {
       switch (e.kind) {
@@ -416,11 +419,13 @@ function frame(now: number): void {
     if (mode === 'map') {
       hud.syncMap(world, run);
       const targets: { x: number; y: number; color: string }[] = [];
-      if (run.battle <= STORY_ACTIONS.length) {
-        const m = STORY_ACTIONS[run.battle - 1];
+      const obj = currentObjective(run);
+      if (obj) {
+        const m = objectivePos(obj);
         targets.push({ x: m.x, y: m.y, color: 'rgba(217,164,65,.9)' });
       }
       hud.syncOffscreen(shell.camera, targets);
+      minimap?.sync(world, run, simTime);
       if (!paused) hud.updateFeed(dtReal);
     }
   }
@@ -432,6 +437,7 @@ function frame(now: number): void {
 (async () => {
   await lib.preload([...SHIP_MODEL_NAMES, ...PROP_MODEL_NAMES]);
   worldView = new WorldView(shell.scene, lib);
+  minimap = new Minimap();
   startRun();
   requestAnimationFrame(frame);
 })().catch((err) => {

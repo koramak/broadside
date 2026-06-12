@@ -12,6 +12,7 @@ import { clamp } from '../sim/math';
 import type { RunState } from '../sim/types';
 import { SECTION_NAMES } from '../sim/boarding';
 import type { BoardingState } from '../sim/boarding';
+import { currentObjective } from '../sim/objectives';
 import { audio } from '../audio';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -293,6 +294,7 @@ export class Hud {
     $('estat').style.display = battle ? 'flex' : 'none';
     $('cargo').style.display = battle ? 'none' : 'block';
     $('rep').style.display = battle ? 'none' : 'block';
+    $('minimap').style.display = battle ? 'none' : 'block';
     if (!battle) $('boardbtn').style.display = 'none';
     if (battle) $('dockbtn').style.display = 'none';
     $('hint').textContent = battle
@@ -314,12 +316,8 @@ export class Hud {
       `rotate(${((world.wind.dir * 180) / Math.PI + 90).toFixed(1)} 27 27)`,
     );
     $('knots').textContent = (p.speed / 14).toFixed(1) + ' kn';
-    $('battleno').textContent =
-      run.battle <= 6
-        ? 'ACTION ' + run.battle + ' — SAIL TO THE GOLD MARK'
-        : run.battle <= 9
-          ? 'THE MIST — ACTION ' + run.battle + ' OF 9'
-          : 'THE SEA REMEMBERS YOU';
+    const obj = currentObjective(run);
+    $('battleno').textContent = obj ? obj.label : 'THE SEA REMEMBERS YOU';
 
     const dock = $('dockbtn');
     if (world.canDock) {

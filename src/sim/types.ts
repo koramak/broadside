@@ -95,6 +95,8 @@ export interface Prize {
 
 export interface RunState {
   battle: number;
+  /** position in the guided objective chain (sim/objectives.ts) */
+  objIdx: number;
   stores: number;
   pool: number;
   up: Record<RefitKey, number>;

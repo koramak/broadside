@@ -16,6 +16,7 @@ import {
   STORY_ACTIONS, WORLD, regionAt,
 } from './worldgen';
 import type { ContactSpec, FactionKey, PortDef } from './worldgen';
+import { currentObjective, objectivePos, onStoryWon, tutorialActive } from './objectives';
 import type { GoodKey } from './economy';
 
 export interface Contact {
@@ -51,6 +52,8 @@ export interface EncounterSpec {
 
 const ENGAGE_RANGE = 130;
 const STORY_RANGE = 170;
+
+const clampDrift = (v: number, m: number): number => (v > m ? m : v < -m ? -m : v);
 const DOCK_RANGE = 230;
 const SPAWN_BUBBLE = 2600;
 const DESPAWN_RANGE = 3600;
@@ -198,7 +201,21 @@ export class World {
   }
 
   step(dt: number, run: RunState): void {
-    this.wind.dir = normAng(this.wind.dir + this.wind.drift * dt);
+    // While the tutorial runs, the wind conspires: it settles onto a beam
+    // reach toward the current gold mark, the fastest point of sail. After
+    // the tutorial it goes back to not caring about you.
+    const obj = currentObjective(run);
+    if (obj && tutorialActive(run)) {
+      const t = objectivePos(obj);
+      const bearing = Math.atan2(t.y - this.player.y, t.x - this.player.x);
+      const a = normAng(bearing + Math.PI / 2);
+      const b = normAng(bearing - Math.PI / 2);
+      const want = Math.abs(normAng(a - this.wind.dir)) < Math.abs(normAng(b - this.wind.dir)) ? a : b;
+      const err = normAng(want - this.wind.dir);
+      this.wind.dir = normAng(this.wind.dir + clampDrift(err, 0.1 * dt));
+    } else {
+      this.wind.dir = normAng(this.wind.dir + this.wind.drift * dt);
+    }
     this.dayT += dt;
     if (this.dayT > 75) {
       this.dayT = 0;
@@ -310,8 +327,10 @@ export class World {
       }
     }
 
-    // story marker
-    if (!this.pendingEncounter && run.battle <= STORY_ACTIONS.length) {
+    // story marker — only live while it IS the current objective, so the
+    // tutorial's port calls get the player's full attention
+    const curObj = currentObjective(run);
+    if (!this.pendingEncounter && curObj && curObj.kind === 'fight' && run.battle <= STORY_ACTIONS.length) {
       const m = STORY_ACTIONS[run.battle - 1];
       if (Math.hypot(m.x - p.x, m.y - p.y) < STORY_RANGE) {
         if (run.battle <= 6) {
@@ -360,6 +379,7 @@ export class World {
     }
     if (enc.story) {
       run.battle++;
+      onStoryWon(run, enc.story, this.events);
       if (run.battle <= 6) {
         this.events.feed('The trail leads on. Action ' + run.battle + ' is marked on your chart.');
       } else if (run.battle === 7) {
