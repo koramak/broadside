@@ -489,23 +489,57 @@ export class Battle {
     this.P().sailIdx = clamp(i, 0, 2);
   }
 
-  /* ============ boarding (placeholder auto-resolve) ============ */
+  /* ============ boarding ============ */
 
-  boardTarget(): Ship | null {
+  /** Grapple window. FEEL: widened while EASY is on (range 78→100, closing
+   *  speed 55→70) — new players kept bouncing off the strict gate. */
+  static boardRange(): number {
+    return EASY.on ? 100 : 78;
+  }
+
+  static boardRelV(): number {
+    return EASY.on ? 70 : 55;
+  }
+
+  /** Why boarding is/isn't available right now — drives button + feedback. */
+  boardCheck(): { ok: boolean; reason: 'none' | 'ghost' | 'far' | 'fast'; foe: Ship | null } {
     const s = this.P();
     const foe = this.nearestEnemy(s);
-    if (!foe || foe.ghost) return null; // you cannot grapple what isn't there
+    if (this.phase !== 'sail' || s.sinking > 0) return { ok: false, reason: 'none', foe: null };
+    if (!foe) return { ok: false, reason: 'none', foe: null };
+    if (foe.ghost) return { ok: false, reason: 'ghost', foe };
     const d = dist(s, foe);
+    if (d >= Battle.boardRange()) return { ok: false, reason: 'far', foe };
     const rv = Math.hypot(
       Math.cos(s.heading) * s.speed - Math.cos(foe.heading) * foe.speed,
       Math.sin(s.heading) * s.speed - Math.sin(foe.heading) * foe.speed,
     );
-    return d < 78 && rv < 55 && this.phase === 'sail' && !s.sinking ? foe : null;
+    if (rv >= Battle.boardRelV()) return { ok: false, reason: 'fast', foe };
+    return { ok: true, reason: 'none', foe };
   }
 
+  boardTarget(): Ship | null {
+    const c = this.boardCheck();
+    return c.ok ? c.foe : null;
+  }
+
+  private boardNagAt = -9;
+  private simClock = 0;
+
   startBoarding(): void {
-    const foe = this.boardTarget();
-    if (!foe) return;
+    const c = this.boardCheck();
+    if (!c.ok) {
+      // tell the player WHY the grapples stay coiled (rate-limited)
+      if (this.simClock - this.boardNagAt > 1.5) {
+        this.boardNagAt = this.simClock;
+        if (c.reason === 'far') this.events.feed('Too far to grapple — lay her alongside, under a ship-length');
+        else if (c.reason === 'fast') this.events.feed('Too much way on — shorten sail and match her speed to grapple');
+        else if (c.reason === 'ghost') this.events.feed('The grapples find nothing to bite on that thing');
+        else this.events.feed('No enemy in grappling reach');
+      }
+      return;
+    }
+    const foe = c.foe!;
     this.phase = 'board';
     this.board = boarding.startBoarding(this.P(), foe);
     this.events.feed('GRAPPLES AWAY — boarding ' + foe.name);
@@ -615,6 +649,7 @@ export class Battle {
 
   /** Advance the battle one fixed timestep. Sets this.outcome when decided. */
   step(dt: number, run: RunState): void {
+    this.simClock += dt;
     this.wind.dir = normAng(this.wind.dir + this.wind.drift * dt);
     if (this.phase === 'sail') {
       const me = this.P();

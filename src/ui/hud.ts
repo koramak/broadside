@@ -8,7 +8,7 @@ import { DOCTRINES, SAILNAMES } from '../sim/constants';
 import { TUNING } from '../sim/tuning';
 import { GOODS, cargoLoad, fleetCargoCap } from '../sim/economy';
 import { FACTIONS } from '../sim/worldgen';
-import { clamp } from '../sim/math';
+import { clamp, dist as distLike } from '../sim/math';
 import type { RunState } from '../sim/types';
 import { SECTION_NAMES } from '../sim/boarding';
 import type { BoardingState } from '../sim/boarding';
@@ -152,7 +152,22 @@ export class Hud {
     const hasFleet = battle.living('p').length > 1;
     $('sigbtn').style.display = hasFleet ? 'block' : 'none';
     $('orderbtn').style.display = hasFleet ? 'block' : 'none';
-    $('boardbtn').style.display = battle.boardTarget() && !paused ? 'block' : 'none';
+    // boarding button teaches its own conditions: visible whenever a real
+    // target is near, label/state says what's missing
+    const bc = battle.boardCheck();
+    const bb = $('boardbtn') as HTMLButtonElement;
+    const foeNear = bc.foe && !bc.foe.ghost && distLike(s, bc.foe) < 240;
+    if (!paused && (bc.ok || (foeNear && (bc.reason === 'far' || bc.reason === 'fast')))) {
+      bb.style.display = 'block';
+      bb.disabled = !bc.ok;
+      bb.textContent = bc.ok
+        ? '⚓ GRAPPLE & BOARD'
+        : bc.reason === 'far'
+          ? '⚓ BOARD — get alongside'
+          : '⚓ BOARD — match her speed';
+    } else {
+      bb.style.display = 'none';
+    }
 
     // chips
     battle.ships.forEach((s2, i) => {
