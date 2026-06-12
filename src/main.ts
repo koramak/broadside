@@ -250,6 +250,23 @@ $('dockbtn').addEventListener('click', () => {
   }
 });
 
+// playtest dials (pause menu) — explicit tester action, defaults stay canon
+import { TUNING, setRake } from './sim/tuning';
+document.querySelectorAll<HTMLButtonElement>('[data-dial]').forEach((b) => {
+  b.addEventListener('click', () => {
+    audio();
+    const dial = b.dataset.dial!;
+    const v = b.dataset.v!;
+    if (dial === 'ball') TUNING.ballSpd = Number(v);
+    if (dial === 'reload') TUNING.reloadBase = Number(v);
+    if (dial === 'rake') setRake(v as 'full' | 'reduced');
+    document
+      .querySelectorAll<HTMLButtonElement>(`[data-dial="${dial}"]`)
+      .forEach((x) => x.classList.toggle('on', x === b));
+    hud.feed('FEEL dial — ' + dial + ' set to ' + v);
+  });
+});
+
 $('orestart').addEventListener('click', () => {
   audio();
   startRun();

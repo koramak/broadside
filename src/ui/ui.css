@@ -86,6 +86,10 @@ button:disabled{opacity:.35;cursor:default}
 #overlay button,#pausemenu .big,#harbor .big{padding:11px 24px;font-size:13px;letter-spacing:.1em}
 #runstats{font-family:'Courier New',monospace;font-size:11px;color:var(--gold)}
 #pausemenu .keys{font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim);line-height:1.7;max-width:400px}
+#dials{display:flex;flex-direction:column;gap:6px;align-items:center;margin:4px 0}
+.drow{display:flex;gap:6px;align-items:center;font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim)}
+.drow span{width:96px;text-align:right;letter-spacing:.08em}
+.drow button{font-size:10px;padding:4px 10px}
 /* harbor */
 #harbor{justify-content:flex-start;padding-top:36px}
 .hrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:760px}
@@ -99,6 +103,12 @@ button:disabled{opacity:.35;cursor:default}
   .bar{width:100px} #hint{display:none}
   #helm{left:12px;bottom:170px} #fleet{bottom:auto;top:150px}
   .chip{width:140px} #ammo{bottom:90px}
-  #boardbtn{bottom:230px} #feed{top:124px;font-size:10px}
+  #boardbtn{bottom:230px} #dockbtn{bottom:230px} #feed{top:124px;font-size:10px}
   .hcard{width:86vw}
+  #cargo{bottom:auto;top:150px;min-width:130px;font-size:9px}
+  #rep{top:260px;min-width:130px}
+  #boarding{bottom:160px;width:94vw}
+  .bsec .bn{width:64px}
+  .hcard.wide{width:94vw}
+  .mrow{flex-wrap:wrap}
 }

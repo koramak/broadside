@@ -44,9 +44,23 @@ Primary asset source: Kenney Pirate Kit (kenney.nl/assets/pirate-kit) — 70 3D 
 ## Open questions (do NOT resolve unilaterally)
 
 - Combat dials pending playtests: ball speed 220/270/360, reload 4.5/5.5/7, rake full/reduced.
-- Boarding: two competing prototypes exist (/reference/broadside-boarding-test-2.html real-time streams, /reference/broadside-boarding-test-3.html turn-based grid). Awaiting playtest verdict. Until then the slice keeps its simple auto-resolve placeholder.
-- Rare-ship rule-break taxonomy: designed in conversation with the human, not in code.
+  (Dials are now live in the pause menu; defaults remain the locked values.)
+- Boarding: two competing prototypes exist (/reference/broadside-boarding-test-2.html real-time streams, /reference/broadside-boarding-test-3.html turn-based grid). The 2026-06-12 goal directive ("boarding must not feel like a pause") was read as picking the real-time direction, and a compact real-time deck fight (src/sim/boarding.ts) replaced the auto-resolve. HUMAN VERDICT STILL WELCOME — the grid prototype remains in reference/ and the sim module is swappable.
+- Rare-ship rule-break taxonomy: designed in conversation with the human, not in code. (One enemy-only rule-breaker shipped as the late-game antagonist: the Drowned ignore the point-of-sail curve. Player-ownable rule-breakers remain undesigned, as agreed.)
 - Title: BROADSIDE is a placeholder.
+
+## Current state (2026-06-12, autonomous build session)
+
+Full game playable end to end: 6-action story spine across a hand-authored
+archipelago (sea map, 6 ports, 3 factions with reputation, 6-good trading
+economy, salvage crates, contacts that flee/patrol/hunt), the locked battle sim
+ported deterministically (src/sim/ — zero Three imports, seeded RNG, fixed
+60 Hz), Kenney Pirate Kit diorama render (oblique camera, GPU flat-shaded sea),
+real-time boarding, and the post-Plate-Ship Mist endgame (3 ghost actions
+ending at THE HARROW). Ghost tuning (new system, not locked values): wind-eff
+floor 0.85, half guns, chain ×0.5 / grape ×0.3 vs ghosts, never strike, cannot
+be boarded. GitHub Pages workflow is committed; needs a git remote + push to go
+live. Local toolchain note: Node lives at ~/.local/node-toolchain (not on PATH).
 
 ## Working agreements
 

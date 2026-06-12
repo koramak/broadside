@@ -2,9 +2,10 @@
 // Deterministic: all randomness flows through the injected Rng. No DOM, no Three.js.
 
 import {
-  AMMO, ARC, ARENA_R, BALL_SPD, CAPTAINS, CLASSES, DOCTRINES,
-  GUN_RANGE, RELOAD_BASE, SHIP_NAMES,
+  AMMO, ARC, ARENA_R, CAPTAINS, CLASSES, DOCTRINES,
+  GUN_RANGE, SHIP_NAMES,
 } from './constants';
+import { TUNING } from './tuning';
 import type { Captain, ShipClass } from './constants';
 import type { FactionKey } from './worldgen';
 import { clamp, dist, normAng, TAU } from './math';
@@ -263,12 +264,12 @@ export class Battle {
       const landR = aimR * rng.rnd(jit[0], jit[1]);
       const lx = px + Math.cos(dir) * landR;
       const ly = py + Math.sin(dir) * landR;
-      const T = landR / BALL_SPD;
+      const T = landR / TUNING.ballSpd;
       avgT += T / n;
       this.balls.push({ sx: px, sy: py, lx, ly, t: 0, T, dir, ammo: s.ammo, team: s.team, vid });
       this.events.emit({ kind: 'muzzle', x: px, y: py, dir });
     }
-    s.reload[side] = RELOAD_BASE;
+    s.reload[side] = TUNING.reloadBase;
     this.events.boom(s.team === 'p' ? 0.45 : 0.3, 0.4, 260);
     if (foe && foe !== this.P() && rng.random() < 0.6) {
       foe.evade = avgT * 0.85;
@@ -298,10 +299,10 @@ export class Battle {
     let mult = 1;
     if (rel < 0.6) {
       rake = 1;
-      mult = 2.2;
+      mult = TUNING.rakeStern;
     } else if (rel > Math.PI - 0.6) {
       rake = 2;
-      mult = 1.7;
+      mult = TUNING.rakeBow;
     }
     if (rake && !this.volleyRakeLogged.has(b.vid)) {
       this.volleyRakeLogged.add(b.vid);

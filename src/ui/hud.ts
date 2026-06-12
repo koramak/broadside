@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import type { Battle } from '../sim/battle';
 import { alive } from '../sim/battle';
-import { DOCTRINES, RELOAD_BASE, SAILNAMES } from '../sim/constants';
+import { DOCTRINES, SAILNAMES } from '../sim/constants';
+import { TUNING } from '../sim/tuning';
 import { GOODS, cargoLoad, fleetCargoCap } from '../sim/economy';
 import { FACTIONS } from '../sim/worldgen';
 import { clamp } from '../sim/math';
@@ -140,7 +141,7 @@ export class Hud {
       const cd = $(i ? 'cdstbd' : 'cdport');
       const lbl = $(i ? 'lblstbd' : 'lblport');
       const ready = s.reload[i] <= 0;
-      cd.style.width = clamp(100 - (s.reload[i] / RELOAD_BASE) * 100, 0, 100) + '%';
+      cd.style.width = clamp(100 - (s.reload[i] / TUNING.reloadBase) * 100, 0, 100) + '%';
       lbl.textContent = (i ? 'STBD ' : 'PORT ') + s.gunsLeft[i];
       btn.classList.toggle('ready', ready);
       btn.classList.toggle('aim', ready && battle.inArc(s, foe, i));
