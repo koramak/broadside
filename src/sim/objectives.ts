@@ -65,7 +65,7 @@ export function onStoryWon(run: RunState, n: number, events: EventQueue): void {
     }
     if (n === 3) {
       events.feed('That’s the shape of it — fight, refit, trade, repeat, bigger every time.');
-      events.feed('The rest of the marks lead to the Plate Ship. The wind stops doing you favors now.');
+      events.feed('The rest of the marks lead to the Plate Ship. The wind keeps a civil tongue, for now.');
     }
   }
 }

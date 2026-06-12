@@ -18,7 +18,8 @@ import type {
 import * as boarding from './boarding';
 import type { BoardingState } from './boarding';
 import type { RunState } from './types';
-import { flagStats } from './run';
+import { flagStats, topUpCrew } from './run';
+import { EASY } from './easing';
 
 export type BattleOutcome =
   | { result: 'won'; salvage: number; pressed: number }
@@ -312,9 +313,11 @@ export class Battle {
     // man-killers find nothing much to bite
     const ghostSail = tgt.ghost ? 0.5 : 1;
     const ghostCrew = tgt.ghost ? 0.3 : 1;
-    tgt.hull = Math.max(0, tgt.hull - a.hull * rng.rnd(0.7, 1.3) * mult);
-    tgt.sailHP = Math.max(0, tgt.sailHP - a.sail * rng.rnd(0.7, 1.3) * (rake ? 1.3 : 1) * ghostSail);
-    tgt.crew = Math.max(0, tgt.crew - a.crew * rng.rnd(0.7, 1.3) * (rake ? 1.4 : 1) * ghostCrew);
+    // testing-phase easing: the player's fleet bruises 20% less
+    const ease = EASY.on && tgt.team === 'p' ? EASY.dmgToPlayer : 1;
+    tgt.hull = Math.max(0, tgt.hull - a.hull * rng.rnd(0.7, 1.3) * mult * ease);
+    tgt.sailHP = Math.max(0, tgt.sailHP - a.sail * rng.rnd(0.7, 1.3) * (rake ? 1.3 : 1) * ghostSail * ease);
+    tgt.crew = Math.max(0, tgt.crew - a.crew * rng.rnd(0.7, 1.3) * (rake ? 1.4 : 1) * ghostCrew * ease);
     if (loc.lx < -tgt.len * 0.25 && (b.ammo === 0 || b.ammo === 1)) {
       const before = tgt.rudderHP;
       tgt.rudderHP = Math.max(0, tgt.rudderHP - (b.ammo === 0 ? 15 : 8));
@@ -573,7 +576,7 @@ export class Battle {
       if (s.team !== 'e') continue;
       if (s.struck) {
         run.pendingPrizes.push({ cls: s.cls, name: s.name, crew: Math.round(s.crew) });
-        pressed += Math.round(s.crew * 0.25);
+        pressed += Math.round(s.crew * (EASY.on ? EASY.pressedFrac : 0.25));
         run.stats.prizes++;
       } else {
         salvage += 18;
@@ -596,6 +599,14 @@ export class Battle {
     run.armada = this.ships
       .filter((s) => s.team === 'p' && s !== f && alive(s))
       .map((s) => ({ cls: s.cls, name: s.name, captain: s.captain! }));
+    // pressed hands report aboard at once — losses refill themselves first,
+    // and whatever's left waits in the pool for prize crews
+    if (run.pool > 0 && run.flag.crewPct < 1) {
+      const before = run.pool;
+      topUpCrew(run);
+      const joined = before - run.pool;
+      if (joined > 0) this.events.feed(joined + ' pressed hands take your shilling — the muster is made good');
+    }
     this.endTimer = 1.1;
     this.endOutcome = { result: 'won', salvage, pressed };
   }

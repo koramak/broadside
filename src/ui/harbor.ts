@@ -1,7 +1,7 @@
 // Harbor screen between actions: repairs, armada roster, prize decisions.
 // Ported from the prototype; logic lives in sim/run.ts, this is just DOM.
 
-import { CLASSES, STRIP_LOOT, CREW_COST, PRIZE_VALUE } from '../sim/constants';
+import { CLASSES, STRIP_LOOT, PRIZE_VALUE } from '../sim/constants';
 import * as runOps from '../sim/run';
 import type { RunState } from '../sim/types';
 import { Rng } from '../sim/rng';
@@ -65,12 +65,19 @@ export class HarborScreen {
     };
 
     if (!this.opts.atSea) {
-      fcard.appendChild(mk('REPAIR HULL +35%', 12, () => runOps.repairHull(run), f.hullPct >= 1));
+      fcard.appendChild(mk('REPAIR HULL +' + Math.round(runOps.REPAIR_AMT() * 100) + '%', runOps.REPAIR_COST(), () => runOps.repairHull(run), f.hullPct >= 1));
       fcard.appendChild(mk('MEND SAILS to full', 8, () => runOps.mendSails(run), f.sailHP >= 100));
       fcard.appendChild(mk('REMOUNT GUNS & RUDDER', 8, () => runOps.remountGuns(run), f.gunDef[0] + f.gunDef[1] === 0 && f.rudderHP >= 100));
-      fcard.appendChild(mk('HIRE 10 HANDS to the pool', 10, () => runOps.hireHands(run), false));
+      const m = runOps.musterCost(run);
+      fcard.appendChild(mk(
+        m.need <= 0 ? 'MUSTER CREW — full strength' : 'MUSTER CREW to full (+' + m.need + ' hands)',
+        m.cost,
+        () => runOps.musterCrew(run),
+        m.need <= 0,
+      ));
+    } else {
+      fcard.appendChild(mk('MUSTER FROM THE POOL (free)', 0, () => runOps.topUpCrew(run), f.crewPct >= 1 || run.pool <= 0));
     }
-    fcard.appendChild(mk('TOP UP CREW from pool (free)', 0, () => runOps.topUpCrew(run), f.crewPct >= 1 || run.pool <= 0));
     ships$.appendChild(fcard);
 
     // armada card
@@ -99,8 +106,14 @@ export class HarborScreen {
         '<div class="d">' + CLASSES[p.cls].name + ', ' + p.crew + ' prisoners aboard.<br>What is your pleasure, captain?</div>';
 
       const take = document.createElement('button');
-      take.textContent = 'CREW HER — join armada (' + CREW_COST[p.cls] + ' hands)';
-      take.disabled = run.armada.length >= 2 || run.pool < CREW_COST[p.cls];
+      const hands = runOps.prizeHands(p.cls);
+      const short = runOps.prizeShortfall(run, p.cls);
+      const full = run.armada.length >= 2;
+      take.textContent =
+        'CREW HER — join armada (' + hands + ' hands' + (short > 0 ? ', hire ' + short + ' for ' + short + ' stores' : ', pool covers it') + ')';
+      if (full) take.textContent = 'CREW HER — armada is full (2/2)';
+      else if (run.stores < short) take.textContent = 'CREW HER — need ' + (short - run.stores) + ' more stores';
+      take.disabled = full || run.stores < short;
       take.addEventListener('click', () => {
         audio();
         runOps.crewPrize(run, i, rng);

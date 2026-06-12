@@ -36,14 +36,15 @@ export class Input {
         if (this.enabled) actions.nextHelm();
         return;
       }
+      if (k.startsWith('arrow')) e.preventDefault();
       if (!this.enabled) return;
       if (k === '1') actions.setAmmo(0);
       if (k === '2') actions.setAmmo(1);
       if (k === '3') actions.setAmmo(2);
       if (k === 'q') actions.fire(0);
       if (k === 'e') actions.fire(1);
-      if (k === 'w') actions.sailUp();
-      if (k === 's') actions.sailDown();
+      if (k === 'w' || k === 'arrowup') actions.sailUp();
+      if (k === 's' || k === 'arrowdown') actions.sailDown();
       if (k === 'f') actions.signal();
       if (k === 'g') actions.toggleOrder();
       if (k === 'b') actions.board();

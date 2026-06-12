@@ -91,11 +91,16 @@ export class PortScreen {
       });
       sv.appendChild(b);
     };
-    mk('REPAIR HULL +35%', 12, () => runOps.repairHull(run), f.hullPct >= 1);
+    mk('REPAIR HULL +' + Math.round(runOps.REPAIR_AMT() * 100) + '%', runOps.REPAIR_COST(), () => runOps.repairHull(run), f.hullPct >= 1);
     mk('MEND SAILS to full', 8, () => runOps.mendSails(run), f.sailHP >= 100);
     mk('REMOUNT GUNS & RUDDER', 8, () => runOps.remountGuns(run), f.gunDef[0] + f.gunDef[1] === 0 && f.rudderHP >= 100);
-    mk('HIRE 10 HANDS', 10, () => runOps.hireHands(run), false);
-    mk('TOP UP CREW (free)', 0, () => runOps.topUpCrew(run), f.crewPct >= 1 || run.pool <= 0);
+    const m = runOps.musterCost(run);
+    mk(
+      m.need <= 0 ? 'MUSTER CREW — full strength' : 'MUSTER CREW to full (+' + m.need + ' hands)',
+      m.cost,
+      () => runOps.musterCrew(run),
+      m.need <= 0,
+    );
 
     // tavern
     const tv = $('ptavern');

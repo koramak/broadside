@@ -1,0 +1,17 @@
+{
+  "env": {
+    "PATH": "/Users/zanezmiller/.local/node-toolchain/node-v22.16.0-darwin-arm64/bin:/Users/zanezmiller/.local/gh-cli/gh_2.94.0_macOS_arm64/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  },
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_eval",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__Claude_Preview__preview_console_logs",
+      "mcp__Claude_Preview__preview_snapshot",
+      "mcp__Claude_Preview__preview_click",
+      "mcp__Claude_Preview__preview_resize",
+      "Bash(npm run build)",
+      "Bash(npm ls *)"
+    ]
+  }
+}

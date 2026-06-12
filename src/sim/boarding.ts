@@ -8,6 +8,7 @@
 import { EventQueue } from './events';
 import { Rng } from './rng';
 import type { Ship } from './types';
+import { EASY } from './easing';
 
 export const SECTION_NAMES = ['BOW', 'WAIST', 'QUARTERDECK'] as const;
 
@@ -141,7 +142,7 @@ export function stepBoarding(
       if (p <= 0 || e <= 0) continue;
       const pEff = Math.min(p, FOOTHOLD_CAP);
       const eEff = Math.min(e, FOOTHOLD_CAP);
-      const pLoss = eEff * K * (b.press ? 1.25 : 0.8) * rng.rnd(0.8, 1.2);
+      const pLoss = eEff * K * (b.press ? 1.25 : 0.8) * rng.rnd(0.8, 1.2) * (EASY.on ? EASY.boardLossToPlayer : 1);
       const eLoss = pEff * K * (b.press ? 1.45 : 1.0) * rng.rnd(0.8, 1.2);
       b.secP[i] = Math.max(0, p - pLoss);
       b.secE[i] = Math.max(0, e - eLoss);

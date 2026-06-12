@@ -201,9 +201,11 @@ export class World {
   }
 
   step(dt: number, run: RunState): void {
-    // While the tutorial runs, the wind conspires: it settles onto a beam
-    // reach toward the current gold mark, the fastest point of sail. After
-    // the tutorial it goes back to not caring about you.
+    // FEEL (testing phase): the map wind is rigged in the player's favor.
+    // During the tutorial it settles onto a beam reach toward the gold mark —
+    // the fastest point of sail. After the tutorial it drifts freely BUT is
+    // hard-clamped so the course to the current objective is never worse
+    // than a broad reach (~0.7 efficiency). Battle wind stays honest.
     const obj = currentObjective(run);
     if (obj && tutorialActive(run)) {
       const t = objectivePos(obj);
@@ -212,9 +214,20 @@ export class World {
       const b = normAng(bearing - Math.PI / 2);
       const want = Math.abs(normAng(a - this.wind.dir)) < Math.abs(normAng(b - this.wind.dir)) ? a : b;
       const err = normAng(want - this.wind.dir);
-      this.wind.dir = normAng(this.wind.dir + clampDrift(err, 0.1 * dt));
+      this.wind.dir = normAng(this.wind.dir + clampDrift(err, 0.12 * dt));
     } else {
       this.wind.dir = normAng(this.wind.dir + this.wind.drift * dt);
+      if (obj) {
+        // never let the objective sit upwind: keep the bearing within 2.0 rad
+        // of downwind (point-of-sail eff ≥ ~0.7 on the locked curve)
+        const t = objectivePos(obj);
+        const bearing = Math.atan2(t.y - this.player.y, t.x - this.player.x);
+        const off = normAng(bearing - this.wind.dir);
+        const MAXOFF = 2.0;
+        if (Math.abs(off) > MAXOFF) {
+          this.wind.dir = normAng(bearing - Math.sign(off) * MAXOFF);
+        }
+      }
     }
     this.dayT += dt;
     if (this.dayT > 75) {

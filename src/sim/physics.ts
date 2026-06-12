@@ -25,10 +25,16 @@ export function rudderFac(s: Ship): number {
   return s.rudderHP <= 0 ? 0.3 : s.rudderHP < 50 ? 0.7 : 1;
 }
 
+/** FEEL: sweeps. A furled ship is rowed at a crawl instead of parking dead —
+ *  speed scales with the hands left to pull the oars. */
+const ROW_SPEED = 11;
+
 /**
  * Advance heading, speed and position for a live ship. Committed turning:
- * turn authority scales with speed; sail health caps drive. Identical to the
+ * turn authority scales with speed; sail health caps drive. Ported from the
  * slice's updateShip core.
+ * FEEL (2026-06-12 playtest): accel/decel rates raised 0.55→0.7 and 1.1→1.4
+ * ("make fast and slow a little faster"), and the rowing floor added.
  */
 export function stepShipPhysics(s: Ship, windDir: number, dt: number): void {
   const spdFac = clamp(s.speed / s.maxSpd, 0, 1);
@@ -36,8 +42,11 @@ export function stepShipPhysics(s: Ship, windDir: number, dt: number): void {
   // The Drowned ignore the point-of-sail curve. This is the rule-break the
   // whole run trains you to feel in your stomach.
   const eff = s.ghost ? Math.max(windEff(s.heading, windDir), 0.85) : windEff(s.heading, windDir);
-  const tgt = s.maxSpd * SAILS[s.sailIdx] * eff * (0.3 + 0.7 * s.sailHP / 100);
-  const rate = tgt > s.speed ? 0.55 : 1.1;
+  let tgt = s.maxSpd * SAILS[s.sailIdx] * eff * (0.3 + 0.7 * s.sailHP / 100);
+  if (s.sailIdx === 0 && !s.ghost) {
+    tgt = Math.max(tgt, ROW_SPEED * (0.3 + 0.7 * (s.crew / s.maxCrew)));
+  }
+  const rate = tgt > s.speed ? 0.7 : 1.4;
   s.speed += (tgt - s.speed) * clamp(dt * rate, 0, 1);
   s.x += Math.cos(s.heading) * s.speed * dt;
   s.y += Math.sin(s.heading) * s.speed * dt;
