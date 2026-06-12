@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Broadside — Combined Test</title>
+<style>
+  :root{--ink:#0b1b22;--parch:#e9dcbe;--parch-dim:#b9ad8e;--rust:#c4583a;--gold:#d9a441}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--ink);font-family:Georgia,'Times New Roman',serif;color:var(--parch)}
+  #c{position:fixed;inset:0;display:block;touch-action:none}
+  .panel{position:fixed;background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:8px 10px;backdrop-filter:blur(2px)}
+  .lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--parch-dim);font-family:'Courier New',monospace}
+  .shipname{font-size:13px;letter-spacing:.06em;margin-bottom:4px}
+  .bar{width:140px;height:7px;background:rgba(233,220,190,.12);border-radius:3px;margin:3px 0 6px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;transition:width .15s}
+  .hull i{background:var(--rust)} .sail i{background:var(--parch)} .crew i{background:var(--gold)}
+  .sub{font-size:9px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.08em}
+  .gauge{display:none;font-size:9px;font-family:'Courier New',monospace;letter-spacing:.12em;color:var(--gold);margin-top:4px}
+  #pstat{top:12px;left:12px}
+  #fleet{bottom:96px;left:12px;display:flex;flex-direction:column;gap:6px;background:none;border:none;padding:0;position:fixed}
+  .chip{background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:5px 8px;width:168px}
+  .chip .nm{font-size:11px}
+  .chip .tr{font-size:8px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.06em}
+  .chip .bar{width:100%;height:4px;margin:3px 0}
+  .chip button{font-size:9px;padding:2px 7px;float:right;margin-top:-2px;font-family:'Courier New',monospace}
+  .chip.dead{opacity:.4}
+  #estat{top:12px;right:12px;display:flex;flex-direction:column;gap:6px;background:none;border:none;padding:0;align-items:flex-end;position:fixed}
+  #estat .chip{width:150px}
+  #windbox{top:12px;left:50%;transform:translateX(-50%);text-align:center;padding:6px 14px}
+  #rose{width:48px;height:48px;margin:2px auto;position:relative}
+  #rose svg{position:absolute;inset:0}
+  #knots{font-family:'Courier New',monospace;font-size:11px;color:var(--parch-dim)}
+  #pausebtn{position:fixed;top:14px;left:calc(50% + 62px);width:36px;height:36px;font-size:15px;border-radius:50%}
+  button{font-family:Georgia,serif;background:rgba(233,220,190,.08);border:1px solid rgba(233,220,190,.3);color:var(--parch);border-radius:6px;cursor:pointer;user-select:none;-webkit-user-select:none}
+  button:active{background:rgba(233,220,190,.22)}
+  button.on{background:rgba(217,164,65,.25);border-color:var(--gold)}
+  button:disabled{opacity:.35;cursor:default}
+  #feed{position:fixed;top:108px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.05em;max-width:90vw}
+  #feed div{color:var(--gold);text-shadow:0 1px 4px #000;margin-top:3px;transition:opacity .5s}
+  #ammo{bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px}
+  #ammo button{padding:8px 11px;font-size:12px;letter-spacing:.05em}
+  #ammo .k{font-size:9px;color:var(--parch-dim);display:block;font-family:'Courier New',monospace}
+  #helm{bottom:14px;left:188px;display:flex;gap:8px;align-items:flex-end;padding:8px;position:fixed}
+  #helm button{width:54px;height:54px;font-size:20px}
+  #sailctl{display:flex;flex-direction:column;gap:4px;align-items:center}
+  #sailctl button{width:54px;height:24px;font-size:13px}
+  #sailset{font-size:9px;letter-spacing:.1em;font-family:'Courier New',monospace;color:var(--parch-dim)}
+  #guns{bottom:14px;right:12px;display:flex;gap:8px;padding:8px;align-items:flex-end}
+  .fbtn{width:84px;height:56px;position:relative;overflow:hidden;font-size:11px;letter-spacing:.06em;font-family:'Courier New',monospace}
+  .fbtn .cd{position:absolute;left:0;bottom:0;top:0;background:rgba(217,164,65,.18);width:0%}
+  .fbtn span{position:relative}
+  .fbtn.ready{border-color:var(--gold)}
+  .fbtn.aim{background:rgba(196,88,58,.28);border-color:var(--rust)}
+  #gunscol{display:flex;flex-direction:column;gap:6px}
+  #sigbtn,#orderbtn{width:84px;height:30px;font-size:9px;letter-spacing:.04em;font-family:'Courier New',monospace}
+  #sigbtn{border-color:var(--gold)}
+  #boardbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none}
+  #hint{bottom:84px;left:50%;transform:translateX(-50%);font-size:10px;font-family:'Courier New',monospace;color:var(--parch-dim);background:none;border:none;text-align:center;position:fixed}
+  #overlay,#pausemenu{position:fixed;inset:0;background:rgba(7,16,20,.88);display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;text-align:center;padding:16px;z-index:20;overflow-y:auto}
+  #overlay h1,#pausemenu h1{font-size:26px;font-weight:normal;letter-spacing:.12em}
+  #overlay p{max-width:440px;color:var(--parch-dim);font-size:14px;line-height:1.5}
+  #overlay button,#pausemenu .big{padding:11px 24px;font-size:14px;letter-spacing:.1em}
+  #prizes{font-family:'Courier New',monospace;font-size:11px;color:var(--gold)}
+  .selrow{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .selrow .lbl{margin-right:4px;width:110px;text-align:right}
+  .selrow button{padding:6px 11px;font-size:12px}
+  #pausemenu .keys{font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim);line-height:1.7;max-width:400px}
+  #boardpanel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:300px;text-align:center;display:none;padding:16px;z-index:15}
+  #boardpanel h2{font-size:15px;letter-spacing:.14em;font-weight:normal;margin-bottom:2px}
+  #boardpanel .psub{font-size:9px;font-family:'Courier New',monospace;color:var(--parch-dim);margin-bottom:10px}
+  #bcrews{display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:13px;margin-bottom:8px}
+  #blog{font-size:11px;color:var(--parch-dim);min-height:30px}
+  @media (max-width:760px){
+    .bar{width:100px} #hint{display:none}
+    #helm{left:12px;bottom:170px} #fleet{bottom:auto;top:150px}
+    .chip{width:140px} #ammo{bottom:90px}
+    #boardbtn{bottom:230px} #feed{top:120px;font-size:10px}
+    .selrow .lbl{width:auto;text-align:center}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="panel" id="pstat">
+  <div class="lbl">At the helm</div>
+  <div class="shipname" id="pname">—</div>
+  <div class="lbl">Hull</div><div class="bar hull"><i id="ph"></i></div>
+  <div class="lbl">Sails</div><div class="bar sail"><i id="ps"></i></div>
+  <div class="lbl">Crew</div><div class="bar crew"><i id="pc"></i></div>
+  <div class="sub" id="prud">Rudder sound</div>
+  <div class="gauge" id="pgauge">⚑ HOLDS THE WIND</div>
+</div>
+
+<div id="fleet"></div>
+<div id="estat"></div>
+
+<div class="panel" id="windbox">
+  <div class="lbl">Wind</div>
+  <div id="rose">
+    <svg viewBox="0 0 54 54">
+      <circle cx="27" cy="27" r="24" fill="none" stroke="rgba(233,220,190,.25)" stroke-width="1"/>
+      <g id="rosearrow">
+        <path d="M27 7 L33 27 L27 23 L21 27 Z" fill="#d9a441"/>
+        <line x1="27" y1="25" x2="27" y2="45" stroke="#d9a441" stroke-width="1.5" opacity=".5"/>
+      </g>
+    </svg>
+  </div>
+  <div id="knots">0.0 kn</div>
+</div>
+<button id="pausebtn">⏸</button>
+<div id="feed"></div>
+
+<div class="panel" id="helm">
+  <button id="bport">◀</button>
+  <div id="sailctl">
+    <button id="bsailup">▲</button>
+    <div id="sailset">FULL SAIL</div>
+    <button id="bsaildn">▼</button>
+  </div>
+  <button id="bstbd">▶</button>
+</div>
+
+<div class="panel" id="ammo">
+  <button id="a0" class="on">Round<span class="k">1 · hull</span></button>
+  <button id="a1">Chain<span class="k">2 · sails</span></button>
+  <button id="a2">Grape<span class="k">3 · crew</span></button>
+</div>
+
+<div class="panel" id="guns">
+  <div id="gunscol">
+    <button id="sigbtn">⚑ SIGNAL (F)</button>
+    <button id="orderbtn">ORDER: ENGAGE (G)</button>
+    <button class="fbtn" id="fport"><div class="cd" id="cdport"></div><span id="lblport">PORT 6</span></button>
+  </div>
+  <button class="fbtn" id="fstbd" style="height:128px"><div class="cd" id="cdstbd"></div><span id="lblstbd">STBD 6</span></button>
+</div>
+
+<button id="boardbtn">⚓ GRAPPLE &amp; BOARD</button>
+<div class="panel" id="hint">A/D steer · W/S sails · 1-3 shot · Q/E fire · F signal · G order · Tab take helm · B board · Esc menu</div>
+
+<div class="panel" id="boardpanel">
+  <h2>BOARDING ACTION</h2>
+  <div class="psub">placeholder auto-resolve</div>
+  <div id="bcrews"><span id="bcp">—</span><span id="bce">—</span></div>
+  <div id="blog">Grappling lines away…</div>
+</div>
+
+<div id="pausemenu">
+  <h1>PAUSED</h1>
+  <div class="selrow"><span class="lbl">Your ship</span>
+    <button data-p="sloop">Sloop</button><button data-p="brig" class="on">Brig</button><button data-p="frigate">Frigate</button>
+  </div>
+  <div class="selrow"><span class="lbl">Your consorts</span>
+    <button data-c="0">0 (duel)</button><button data-c="1">1</button><button data-c="2" class="on">2</button>
+  </div>
+  <div class="selrow"><span class="lbl">Enemy ships</span>
+    <button data-n="1">1</button><button data-n="2" class="on">2</button><button data-n="3">3</button>
+  </div>
+  <div class="selrow"><span class="lbl">Enemy class</span>
+    <button data-ec="random" class="on">Random</button><button data-ec="sloop">Sloop</button><button data-ec="brig">Brig</button><button data-ec="frigate">Frigate</button>
+  </div>
+  <div class="selrow"><span class="lbl">Consort guns</span>
+    <button data-f="will" class="on">AT WILL</button><button data-f="signal">ON SIGNAL ONLY</button>
+  </div>
+  <div class="selrow"><span class="lbl">Shot speed</span>
+    <button data-bs="220">Slow</button><button data-bs="270" class="on">Medium</button><button data-bs="360">Fast</button>
+  </div>
+  <div class="selrow"><span class="lbl">Reload</span>
+    <button data-rl="4.5">Quick</button><button data-rl="5.5" class="on">Standard</button><button data-rl="7">Heavy</button>
+  </div>
+  <div class="selrow"><span class="lbl">Rake damage</span>
+    <button data-rk="full" class="on">Full</button><button data-rk="half">Reduced</button><button data-rk="off">Off</button>
+  </div>
+  <div class="selrow"><span class="lbl">AI dodges shot</span>
+    <button data-dg="on" class="on">On</button><button data-dg="off">Off</button>
+  </div>
+  <button class="big" id="presume">RESUME</button>
+  <button class="big" id="prestart">RESTART WITH THESE SETTINGS</button>
+  <div class="keys">
+    0 consorts = the pure 1v1 duel. Shot speed, reload, and rake are the core feel dials.<br>
+    F — signal: consorts with a target in arc fire, rolling down the line.<br>
+    G — toggle consort order between ENGAGE (fight by doctrine) and FORM ON ME (hold fire, fall in behind you).<br>
+    Tab / HELM — take the wheel of any ship in your armada.
+  </div>
+</div>
+
+<div id="overlay">
+  <h1 id="otitle">—</h1>
+  <p id="otext">—</p>
+  <div id="prizes"></div>
+  <button id="orestart">NEXT ENGAGEMENT</button>
+</div>
+
+<script>
+'use strict';
+const TAU=Math.PI*2;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rnd=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
+const normAng=a=>{a=(a+Math.PI)%TAU;if(a<0)a+=TAU;return a-Math.PI;};
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const $=id=>document.getElementById(id);
+
+const cv=$('c'),ctx=cv.getContext('2d');
+function resize(){cv.width=innerWidth*devicePixelRatio;cv.height=innerHeight*devicePixelRatio;
+  cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
+addEventListener('resize',resize);resize();
+
+let AC=null;
+function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();}
+function boom(vol=0.5,len=0.35,freq=300){
+  if(!AC)return;
+  const t=AC.currentTime,buf=AC.createBuffer(1,AC.sampleRate*len,AC.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.2);
+  const src=AC.createBufferSource();src.buffer=buf;
+  const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=freq;
+  const g=AC.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+len);
+  src.connect(f);f.connect(g);g.connect(AC.destination);src.start();
+}
+
+const CLASSES={
+  sloop:  {name:'Sloop',   maxSpd:135, turn:1.55, hull:75,  crew:60,  guns:4, len:54, beam:16},
+  brig:   {name:'Brig',    maxSpd:112, turn:1.15, hull:115, crew:100, guns:6, len:68, beam:20},
+  frigate:{name:'Frigate', maxSpd:96,  turn:0.85, hull:170, crew:150, guns:9, len:84, beam:25},
+};
+const SHIP_NAMES=['Esperanza','Triton','Vengador','Cormorant','Santa Rosa','Harrier','Dunkirk','Marisol','Pelican','Alba','Reprisal','Cardenal'];
+const DOCTRINES={
+  bulldog:{label:'THE BULLDOG · closes to point blank',range:95, astern:false},
+  surgeon:{label:'THE SURGEON · holds 200 yds, shreds sails',range:210,astern:false},
+  corsair:{label:'THE CORSAIR · hunts the stern rake',range:150,astern:true},
+};
+const CAPTAINS=[['Ibarra','bulldog'],['Quist','surgeon'],['Mosquera','corsair'],['Renard','corsair'],['Holt','bulldog'],['Ife','surgeon']];
+const SAILS=[0,0.5,1],SAILNAMES=['FURLED','HALF SAIL','FULL SAIL'];
+const AMMO=[
+  {name:'Round',rangeMul:1.0,hull:7,sail:1,crew:1},
+  {name:'Chain',rangeMul:0.72,hull:2,sail:9,crew:0.5},
+  {name:'Grape',rangeMul:0.5,hull:1,sail:0,crew:6},
+];
+const GUN_RANGE=300,ARC=0.62,ARENA_R=1700;
+
+/* tuning options (pause menu) */
+let optBallSpd=270,optReload=5.5,optRake='full',optDodge=true;
+let selP='brig',optConsorts=2,optEnemies=2,optEnemyCls='random',optFire='will';
+
+let nameBag=[];
+function shipName(){if(!nameBag.length)nameBag=SHIP_NAMES.slice().sort(()=>Math.random()-0.5);return nameBag.pop();}
+
+function makeShip(cls,team,x,y,heading){
+  const c=CLASSES[cls];
+  return {cls,team,x,y,heading,speed:0,rudder:0,sailIdx:2,
+    maxSpd:c.maxSpd,turn:c.turn,len:c.len,beam:c.beam,
+    gunsMax:c.guns,gunsLeft:[c.guns,c.guns],
+    hull:c.hull,maxHull:c.hull,sailHP:100,crew:c.crew,maxCrew:c.crew,
+    rudderHP:100,mastStage:0,reload:[0,0],ammo:0,
+    sinking:0,struck:false,gauge:false,
+    name:c.name,captain:null,doctrine:null,evade:0,evadeDir:1,wakeT:0,dead:false};
+}
+function alive(s){return !s.dead&&!s.struck&&s.sinking===0;}
+
+let wind={dir:rnd(TAU),drift:rnd(-0.012,0.012)};
+let ships=[],ctrl=0,balls=[],fx=[],streaks=[],feedItems=[],pendingFires=[];
+let phase='sail',paused=false,prizes=0,board=null,volleyRakeLogged=new Set(),volleyCounter=0;
+let formUp=false;
+
+const P=()=>ships[ctrl];
+const fleet=t=>ships.filter(s=>s.team===t);
+const living=t=>ships.filter(s=>s.team===t&&alive(s));
+function nearestEnemy(s){
+  let best=null,bd=1e9;
+  for(const o of ships)if(o.team!==s.team&&!o.dead&&o.sinking<2&&!o.struck){const d=dist(s,o);if(d<bd){bd=d;best=o;}}
+  return best;
+}
+
+function newBattle(){
+  wind.dir=rnd(TAU);wind.drift=rnd(-0.012,0.012);
+  ships=[];balls=[];fx=[];pendingFires=[];volleyRakeLogged.clear();nameBag=[];
+  board=null;phase='sail';formUp=false;
+  const caps=CAPTAINS.slice().sort(()=>Math.random()-0.5);
+  const ph=rnd(TAU);
+  const flag=makeShip(selP,'p',0,0,ph);
+  flag.name=CLASSES[selP].name+' Persistence';flag.captain=['You','—'];
+  ships.push(flag);ctrl=0;
+  const consortCls=['sloop','frigate'];
+  for(let i=0;i<optConsorts;i++){
+    const off=normAng(ph+Math.PI/2);
+    const k=(i===0?1:-1)*110;
+    const s=makeShip(consortCls[i%2],'p',Math.cos(off)*k,Math.sin(off)*k,ph);
+    const cap=caps.pop();
+    s.captain=cap;s.doctrine=cap[1];
+    s.name=CLASSES[s.cls].name+' '+shipName();
+    ships.push(s);
+  }
+  const a=rnd(TAU);
+  for(let i=0;i<optEnemies;i++){
+    const ecls=optEnemyCls==='random'?['sloop','brig','frigate'][Math.floor(rnd(3))]:optEnemyCls;
+    const e=makeShip(ecls,'e',Math.cos(a)*680+rnd(-120,120),Math.sin(a)*680+rnd(-120,120),rnd(TAU));
+    const cap=caps.pop()||['Drake','bulldog'];
+    e.captain=cap;e.doctrine=cap[1];
+    e.name=CLASSES[ecls].name+' '+shipName();
+    ships.push(e);
+  }
+  streaks=[];for(let i=0;i<70;i++)streaks.push({x:rnd(-ARENA_R,ARENA_R),y:rnd(-ARENA_R,ARENA_R),p:rnd(1)});
+  $('overlay').style.display='none';$('boardpanel').style.display='none';
+  $('feed').innerHTML='';feedItems=[];
+  buildChips();applyHelmUI();syncOrderBtn();
+  setPaused(false);
+}
+
+function feed(msg){
+  const el=document.createElement('div');el.textContent=msg;
+  $('feed').appendChild(el);feedItems.push({el,t:4});
+  while(feedItems.length>3){const o=feedItems.shift();o.el.remove();}
+}
+function updateFeed(dt){
+  for(let i=feedItems.length-1;i>=0;i--){
+    const f=feedItems[i];f.t-=dt;
+    if(f.t<1)f.el.style.opacity=Math.max(0,f.t);
+    if(f.t<=0){f.el.remove();feedItems.splice(i,1);}
+  }
+}
+
+function windEff(heading){
+  const off=Math.abs(normAng(heading-wind.dir));
+  const pts=[[0,.80],[Math.PI*.25,.95],[Math.PI*.5,1.0],[Math.PI*.75,.45],[2.95,.08],[Math.PI,.05]];
+  for(let i=0;i<pts.length-1;i++){
+    if(off<=pts[i+1][0]){
+      const t=(off-pts[i][0])/(pts[i+1][0]-pts[i][0]);
+      return lerp(pts[i][1],pts[i+1][1],t);
+    }
+  }
+  return .05;
+}
+function rudderFac(s){return s.rudderHP<=0?0.3:(s.rudderHP<50?0.7:1);}
+function updateShip(s,dt){
+  if(s.sinking>0){s.sinking+=dt;s.speed*=0.985;s.x+=Math.cos(s.heading)*s.speed*dt;s.y+=Math.sin(s.heading)*s.speed*dt;
+    if(s.sinking>3.4&&!s.dead){s.dead=true;feed(s.name+' goes down');}
+    return;}
+  if(s.struck){s.speed*=0.98;s.x+=Math.cos(s.heading)*s.speed*dt;s.y+=Math.sin(s.heading)*s.speed*dt;return;}
+  const spdFac=clamp(s.speed/s.maxSpd,0,1);
+  s.heading=normAng(s.heading+s.rudder*s.turn*rudderFac(s)*(0.35+0.65*spdFac)*dt);
+  const tgt=s.maxSpd*SAILS[s.sailIdx]*windEff(s.heading)*(0.3+0.7*s.sailHP/100);
+  const rate=tgt>s.speed?0.55:1.1;
+  s.speed+=(tgt-s.speed)*clamp(dt*rate,0,1);
+  s.x+=Math.cos(s.heading)*s.speed*dt;
+  s.y+=Math.sin(s.heading)*s.speed*dt;
+  const d=Math.hypot(s.x,s.y);
+  if(d>ARENA_R){const k=(d-ARENA_R)/d;s.x-=s.x*k;s.y-=s.y*k;s.speed*=0.9;}
+  let crewFac=0.55+0.45*(s.crew/s.maxCrew);
+  if(s.gauge)crewFac*=1.12;
+  for(let i=0;i<2;i++)s.reload[i]=Math.max(0,s.reload[i]-dt*crewFac);
+  s.wakeT-=dt;
+  if(s.speed>15&&s.wakeT<=0){s.wakeT=0.07;
+    fx.push({t:'wake',x:s.x-Math.cos(s.heading)*s.len*.45,y:s.y-Math.sin(s.heading)*s.len*.45,r:3,life:1.6,max:1.6});}
+}
+
+function inArc(s,t,side){
+  if(!t)return false;
+  const ang=Math.atan2(t.y-s.y,t.x-s.x);
+  const sideDir=normAng(s.heading+(side?1:-1)*Math.PI/2);
+  const rng=GUN_RANGE*AMMO[s.ammo].rangeMul;
+  return Math.abs(normAng(ang-sideDir))<ARC&&dist(s,t)<rng+40;
+}
+function fire(s,side){
+  if(s.reload[side]>0||s.sinking>0||s.struck||phase!=='sail'||paused)return;
+  if(s.gunsLeft[side]<=0)return;
+  const a=AMMO[s.ammo];
+  const maxR=GUN_RANGE*a.rangeMul;
+  const foe=nearestEnemy(s);
+  const sideDir=normAng(s.heading+(side?1:-1)*Math.PI/2);
+  let aimR=maxR*0.75;
+  if(foe){
+    const bearing=Math.atan2(foe.y-s.y,foe.x-s.x);
+    if(Math.abs(normAng(bearing-sideDir))<ARC)aimR=clamp(dist(s,foe),36,maxR);
+  }
+  const n=s.gunsLeft[side];
+  const vid=++volleyCounter;
+  const jit=s.gauge?[0.92,1.08]:[0.86,1.14];
+  const sprd=s.gauge?0.10:0.14;
+  let avgT=0;
+  for(let i=0;i<n;i++){
+    const along=(n===1?0:(i/(n-1)-0.5))*s.len*0.7;
+    const px=s.x+Math.cos(s.heading)*along+Math.cos(sideDir)*s.beam*0.55;
+    const py=s.y+Math.sin(s.heading)*along+Math.sin(sideDir)*s.beam*0.55;
+    const dir=sideDir+(Math.random()-0.5)*sprd;
+    const landR=aimR*rnd(jit[0],jit[1]);
+    const lx=px+Math.cos(dir)*landR,ly=py+Math.sin(dir)*landR;
+    const T=landR/optBallSpd;avgT+=T/n;
+    balls.push({sx:px,sy:py,lx,ly,t:0,T,dir,ammo:s.ammo,team:s.team,vid});
+    fx.push({t:'smoke',x:px,y:py,r:rnd(4,8),life:0.9,max:0.9,vx:Math.cos(dir)*22,vy:Math.sin(dir)*22});
+  }
+  s.reload[side]=optReload;
+  boom(s.team==='p'?0.45:0.3,0.4,260);
+  if(optDodge&&foe&&foe!==P()&&Math.random()<0.6){foe.evade=avgT*0.85;foe.evadeDir=Math.random()<0.5?-1:1;}
+}
+function shipLocal(x,y,s){
+  const dx=x-s.x,dy=y-s.y,c=Math.cos(-s.heading),sn=Math.sin(-s.heading);
+  return {lx:dx*c-dy*sn,ly:dx*sn+dy*c};
+}
+function pointInShip(x,y,s){
+  const p=shipLocal(x,y,s);
+  return Math.abs(p.lx)<s.len*0.5+4&&Math.abs(p.ly)<s.beam*0.5+4;
+}
+function rakeMults(){
+  if(optRake==='off')return [1,1];
+  if(optRake==='half')return [1.6,1.35];
+  return [2.2,1.7];
+}
+function applyHit(tgt,b){
+  const a=AMMO[b.ammo];
+  const loc=shipLocal(b.lx,b.ly,tgt);
+  const rel=Math.abs(normAng(b.dir-tgt.heading));
+  const [sternM,bowM]=rakeMults();
+  let rake=0,mult=1;
+  if(rel<0.6){rake=1;mult=sternM;}
+  else if(rel>Math.PI-0.6){rake=2;mult=bowM;}
+  if(rake&&mult>1&&!volleyRakeLogged.has(b.vid)){
+    volleyRakeLogged.add(b.vid);
+    feed('Raking fire down the deck of '+tgt.name+'!');
+  }
+  tgt.hull=Math.max(0,tgt.hull-a.hull*rnd(0.7,1.3)*mult);
+  tgt.sailHP=Math.max(0,tgt.sailHP-a.sail*rnd(0.7,1.3)*(rake?1.3:1));
+  tgt.crew=Math.max(0,tgt.crew-a.crew*rnd(0.7,1.3)*(rake?1.4:1));
+  if(loc.lx<-tgt.len*0.25&&(b.ammo===0||b.ammo===1)){
+    const before=tgt.rudderHP;
+    tgt.rudderHP=Math.max(0,tgt.rudderHP-(b.ammo===0?15:8));
+    if(before>=50&&tgt.rudderHP<50)feed('Rudder damaged — '+tgt.name);
+    if(before>0&&tgt.rudderHP<=0)feed('Rudder shot away — '+tgt.name);
+  }
+  if(Math.abs(loc.lx)<=tgt.len*0.25&&b.ammo===0){
+    const facing=loc.ly>0?1:0;
+    if(tgt.gunsLeft[facing]>0&&Math.random()<0.18){
+      tgt.gunsLeft[facing]--;
+      feed('Gun dismounted — '+tgt.name);
+    }
+  }
+  const stage=tgt.sailHP<25?2:tgt.sailHP<60?1:0;
+  if(stage>tgt.mastStage){
+    tgt.mastStage=stage;
+    feed(stage===1?('Topmasts hit — '+tgt.name):('Mast down — '+tgt.name+' is crawling'));
+  }
+  boom(0.16,0.18,700);
+  if(tgt.hull<=0&&!tgt.sinking)tgt.sinking=0.001;
+  if(tgt.crew<=Math.max(6,tgt.maxCrew*0.08)&&!tgt.struck&&!tgt.sinking){
+    tgt.struck=true;feed(tgt.name+' strikes her colors!');
+    if(tgt.team==='e')prizes++;
+  }
+}
+
+function updateAI(s,dt){
+  if(!alive(s))return;
+  const isMyConsort=s.team==='p';
+  // forming up: fall in behind the controlled ship, hold fire
+  if(isMyConsort&&formUp){
+    const lead=P();
+    const idx=ships.indexOf(s);
+    const back=normAng(lead.heading+Math.PI);
+    const perp=normAng(lead.heading+Math.PI/2);
+    const k=(idx%2?1:-1)*70;
+    const tx=lead.x+Math.cos(back)*110+Math.cos(perp)*k;
+    const ty=lead.y+Math.sin(back)*110+Math.sin(perp)*k;
+    let want=Math.atan2(ty-s.y,tx-s.x);
+    const err=normAng(want-s.heading);
+    s.rudder=Math.abs(err)<0.06?0:(err>0?1:-1);
+    s.sailIdx=dist(s,{x:tx,y:ty})<60?1:2;
+    return;
+  }
+  const foe=nearestEnemy(s);
+  if(!foe){s.rudder=0;return;}
+  const d=dist(s,foe);
+  if(s.evade>0){
+    s.evade-=dt;s.rudder=s.evadeDir;s.sailIdx=2;
+  } else {
+    const doc=DOCTRINES[s.doctrine]||DOCTRINES.bulldog;
+    let tx,ty;
+    if(s.hull<s.maxHull*0.20){tx=s.x+Math.cos(wind.dir)*400;ty=s.y+Math.sin(wind.dir)*400;}
+    else if(d>420){tx=foe.x;ty=foe.y;}
+    else if(doc.astern){
+      const astern=normAng(foe.heading+Math.PI);
+      tx=foe.x+Math.cos(astern)*doc.range-Math.cos(wind.dir)*50;
+      ty=foe.y+Math.sin(astern)*doc.range-Math.sin(wind.dir)*50;
+    } else {
+      const toMe=Math.atan2(s.y-foe.y,s.x-foe.x);
+      const sA=normAng(foe.heading+Math.PI/2),sB=normAng(foe.heading-Math.PI/2);
+      const side=Math.abs(normAng(toMe-sA))<Math.abs(normAng(toMe-sB))?sA:sB;
+      tx=foe.x+Math.cos(side)*doc.range;ty=foe.y+Math.sin(side)*doc.range;
+    }
+    let want=Math.atan2(ty-s.y,tx-s.x);
+    const upwind=normAng(wind.dir+Math.PI);
+    const offUp=normAng(want-upwind);
+    if(Math.abs(offUp)<0.55)want=normAng(upwind+(offUp>=0?0.8:-0.8));
+    const err=normAng(want-s.heading);
+    s.rudder=Math.abs(err)<0.06?0:(err>0?1:-1);
+    s.sailIdx=2;
+  }
+  if(s.doctrine==='surgeon'){s.ammo=foe.sailHP>40&&d>150?1:0;}
+  else if(s.doctrine==='bulldog'){s.ammo=d<110?2:0;}
+  else {s.ammo=0;}
+  const holdFire=isMyConsort&&optFire==='signal';
+  if(!holdFire){
+    for(let side=0;side<2;side++){
+      if(s.reload[side]<=0&&s.gunsLeft[side]>0&&inArc(s,foe,side)&&Math.random()<dt*6)fire(s,side);
+    }
+  }
+}
+
+function signal(){
+  if(phase!=='sail'||paused)return;
+  let k=0,any=false;
+  for(const s of fleet('p')){
+    if(s===P()||!alive(s))continue;
+    const foe=nearestEnemy(s);
+    for(let side=0;side<2;side++){
+      if(s.reload[side]<=0&&s.gunsLeft[side]>0&&inArc(s,foe,side)){
+        pendingFires.push({s,side,t:0.18+k*0.32});
+        k++;any=true;
+      }
+    }
+  }
+  if(any){boom(0.35,0.2,900);feed('Signal gun — fleet fires!');}
+  else feed('Signal — no consort has a target in arc');
+}
+function updatePending(dt){
+  for(let i=pendingFires.length-1;i>=0;i--){
+    const p=pendingFires[i];p.t-=dt;
+    if(p.t<=0){fire(p.s,p.side);pendingFires.splice(i,1);}
+  }
+}
+function toggleOrder(){
+  formUp=!formUp;
+  feed(formUp?'Fleet signal — form on me, hold fire':'Fleet signal — engage the enemy');
+  syncOrderBtn();
+}
+function syncOrderBtn(){
+  $('orderbtn').textContent='ORDER: '+(formUp?'FORM ON ME':'ENGAGE')+' (G)';
+  $('orderbtn').classList.toggle('on',formUp);
+}
+
+function takeHelm(idx){
+  const s=ships[idx];
+  if(!s||s.team!=='p'||!alive(s))return;
+  ctrl=idx;applyHelmUI();
+  feed('You take the helm of '+s.name);
+}
+function nextHelm(){
+  const mine=ships.map((s,i)=>i).filter(i=>ships[i].team==='p'&&alive(ships[i]));
+  if(!mine.length)return;
+  const cur=mine.indexOf(ctrl);
+  takeHelm(mine[(cur+1)%mine.length]);
+}
+function applyHelmUI(){
+  const s=P();
+  $('pname').textContent=s.name;
+  setAmmo(s.ammo);
+  $('sailset').textContent=SAILNAMES[s.sailIdx];
+  buildChips();
+}
+
+function buildChips(){
+  const f=$('fleet');f.innerHTML='';
+  ships.forEach((s,i)=>{
+    if(s.team!=='p'||i===ctrl)return;
+    const doc=DOCTRINES[s.doctrine];
+    const c=document.createElement('div');c.className='chip';c.id='chip'+i;
+    c.innerHTML=`<button data-h="${i}">HELM</button><div class="nm">${s.name}</div>
+      <div class="tr">Capt. ${s.captain[0]} · ${doc?doc.label:''}</div>
+      <div class="bar hull"><i></i></div>`;
+    f.appendChild(c);
+  });
+  const e=$('estat');e.innerHTML='';
+  ships.forEach((s,i)=>{
+    if(s.team!=='e')return;
+    const c=document.createElement('div');c.className='chip';c.id='chip'+i;
+    c.innerHTML=`<div class="nm">${s.name}</div>
+      <div class="tr">Capt. ${s.captain[0]}</div>
+      <div class="bar hull"><i></i></div>`;
+    e.appendChild(c);
+  });
+  document.querySelectorAll('[data-h]').forEach(b=>b.addEventListener('click',()=>{audio();takeHelm(+b.dataset.h);}));
+}
+function syncChips(){
+  ships.forEach((s,i)=>{
+    const c=$('chip'+i);if(!c)return;
+    const bar=c.querySelector('.bar i');
+    if(bar)bar.style.width=(s.hull/s.maxHull*100)+'%';
+    c.classList.toggle('dead',!alive(s));
+  });
+}
+
+function boardTarget(){
+  const s=P(),foe=nearestEnemy(s);
+  if(!foe)return null;
+  const d=dist(s,foe);
+  const rv=Math.hypot(
+    Math.cos(s.heading)*s.speed-Math.cos(foe.heading)*foe.speed,
+    Math.sin(s.heading)*s.speed-Math.sin(foe.heading)*foe.speed);
+  return (d<78&&rv<55&&phase==='sail'&&!s.sinking)?foe:null;
+}
+function startBoarding(){
+  const foe=boardTarget();
+  if(!foe)return;
+  phase='board';
+  board={p:Math.round(P().crew),e:Math.round(foe.crew),foe,tick:0};
+  $('boardpanel').style.display='block';
+  $('blog').textContent='Grappling lines away…';
+  boom(0.4,0.5,180);
+}
+const BLOGS=['Steel rings across the deck.','The melee surges forward.','Pistol smoke over the rail.','They give ground at the mast.','Cutlasses at the quarterdeck.'];
+function updateBoarding(dt){
+  board.tick+=dt;
+  P().speed*=0.95;board.foe.speed*=0.95;
+  if(board.tick>=0.55){
+    board.tick=0;
+    const pPow=board.p*rnd(0.8,1.2),ePow=board.e*rnd(0.8,1.2);
+    board.e=Math.max(0,board.e-Math.round(pPow*0.09+rnd(0,2)));
+    board.p=Math.max(0,board.p-Math.round(ePow*0.09+rnd(0,2)));
+    $('blog').textContent=BLOGS[Math.floor(rnd(BLOGS.length))];
+    boom(0.12,0.12,900);
+    const pq=board.p<=Math.max(4,P().maxCrew*0.1),eq=board.e<=Math.max(4,board.foe.maxCrew*0.1);
+    if(pq||eq){
+      P().crew=board.p;board.foe.crew=board.e;
+      $('boardpanel').style.display='none';
+      if(eq&&!pq){prizes++;board.foe.struck=true;feed(board.foe.name+' is taken!');}
+      else if(pq&&!eq){P().struck=true;feed('Boarders repelled — '+P().name+' is lost');}
+      else {P().struck=true;board.foe.struck=true;}
+      board=null;phase='sail';
+      return;
+    }
+  }
+  $('bcp').textContent='You: '+board.p;
+  $('bce').textContent='Foe: '+board.e;
+}
+
+function checkOutcome(){
+  if(phase!=='sail')return;
+  const pAlive=living('p'),eAlive=living('e');
+  if(!eAlive.length){
+    endBattle('THE DAY IS YOURS',
+      'Enemy squadron destroyed or taken. '+prizes+' prize'+(prizes===1?'':'s')+' this session would join your armada.');
+  } else if(!pAlive.length){
+    endBattle('SQUADRON LOST','Every ship under your flag is sunk, struck, or taken.');
+  } else if(!alive(P())){
+    nextHelm();
+  }
+}
+function endBattle(title,text){
+  phase='end';
+  setTimeout(()=>{
+    $('otitle').textContent=title;
+    $('otext').textContent=text;
+    $('prizes').textContent='Prizes taken this session: '+prizes;
+    $('overlay').style.display='flex';
+  },900);
+}
+function setPaused(v){
+  if(v&&phase==='end')return;
+  paused=v;
+  $('pausemenu').style.display=v?'flex':'none';
+}
+
+const keys={};
+addEventListener('keydown',e=>{
+  audio();
+  const k=e.key.toLowerCase();keys[k]=true;
+  if(k==='escape'||k==='p'){setPaused(!paused);return;}
+  if(k==='tab'){e.preventDefault();if(!paused)nextHelm();return;}
+  if(paused)return;
+  if(k==='1')setAmmo(0);if(k==='2')setAmmo(1);if(k==='3')setAmmo(2);
+  if(k==='q')fire(P(),0);if(k==='e')fire(P(),1);
+  if(k==='w')setSail(P().sailIdx+1);if(k==='s')setSail(P().sailIdx-1);
+  if(k==='f')signal();
+  if(k==='g')toggleOrder();
+  if(k==='b')startBoarding();
+});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+function setAmmo(i){P().ammo=i;for(let j=0;j<3;j++)$('a'+j).classList.toggle('on',j===i);}
+function setSail(i){P().sailIdx=clamp(i,0,2);$('sailset').textContent=SAILNAMES[P().sailIdx];}
+function holdBtn(id,fn){
+  const el=$(id);
+  const on=e=>{e.preventDefault();audio();fn(true);};
+  const off=e=>{e.preventDefault();fn(false);};
+  el.addEventListener('pointerdown',on);
+  el.addEventListener('pointerup',off);
+  el.addEventListener('pointerleave',off);
+  el.addEventListener('pointercancel',off);
+}
+let touchPort=false,touchStbd=false;
+holdBtn('bport',v=>touchPort=v);
+holdBtn('bstbd',v=>touchStbd=v);
+$('bsailup').addEventListener('click',()=>{audio();setSail(P().sailIdx+1);});
+$('bsaildn').addEventListener('click',()=>{audio();setSail(P().sailIdx-1);});
+for(let i=0;i<3;i++)$('a'+i).addEventListener('click',((j)=>()=>{audio();setAmmo(j);})(i));
+$('fport').addEventListener('click',()=>{audio();fire(P(),0);});
+$('fstbd').addEventListener('click',()=>{audio();fire(P(),1);});
+$('sigbtn').addEventListener('click',()=>{audio();signal();});
+$('orderbtn').addEventListener('click',()=>{audio();toggleOrder();});
+$('boardbtn').addEventListener('click',()=>{audio();startBoarding();});
+$('orestart').addEventListener('click',()=>{audio();newBattle();});
+$('pausebtn').addEventListener('click',()=>{audio();setPaused(!paused);});
+$('presume').addEventListener('click',()=>setPaused(false));
+$('prestart').addEventListener('click',()=>{audio();newBattle();});
+function bindOpt(attr,fn){
+  document.querySelectorAll('['+attr+']').forEach(b=>b.addEventListener('click',()=>{
+    fn(b.getAttribute(attr));
+    document.querySelectorAll('['+attr+']').forEach(x=>x.classList.toggle('on',x===b));
+  }));
+}
+bindOpt('data-p',v=>selP=v);
+bindOpt('data-c',v=>optConsorts=+v);
+bindOpt('data-n',v=>optEnemies=+v);
+bindOpt('data-ec',v=>optEnemyCls=v);
+bindOpt('data-f',v=>optFire=v);
+bindOpt('data-bs',v=>optBallSpd=+v);
+bindOpt('data-rl',v=>optReload=+v);
+bindOpt('data-rk',v=>optRake=v);
+bindOpt('data-dg',v=>optDodge=v==='on');
+
+function drawShip(s){
+  ctx.save();ctx.translate(s.x,s.y);ctx.rotate(s.heading);
+  const sink=s.sinking>0?clamp(s.sinking/3.5,0,1):0;
+  ctx.globalAlpha=(1-sink)*(s.struck?0.7:1);
+  ctx.scale(1-sink*0.25,1-sink*0.25);
+  const L=s.len,B=s.beam;
+  ctx.beginPath();
+  ctx.moveTo(L*0.5,0);
+  ctx.quadraticCurveTo(L*0.18,-B*0.55,-L*0.42,-B*0.45);
+  ctx.lineTo(-L*0.5,0);
+  ctx.lineTo(-L*0.42,B*0.45);
+  ctx.quadraticCurveTo(L*0.18,B*0.55,L*0.5,0);
+  ctx.fillStyle=s.team==='p'?'#5a4632':'#4a3a3a';
+  ctx.fill();
+  ctx.strokeStyle=ships[ctrl]===s?'rgba(217,164,65,.85)':'rgba(233,220,190,.45)';
+  ctx.lineWidth=ships[ctrl]===s?1.8:1.2;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(L*0.34,0);ctx.lineTo(-L*0.4,0);
+  ctx.strokeStyle='rgba(233,220,190,.18)';ctx.stroke();
+  const set=SAILS[s.sailIdx],shp=s.sailHP/100;
+  const sailW=B*1.9*(0.25+0.75*set);
+  const cols=`rgba(${Math.round(190+45*shp)},${Math.round(180+35*shp)},${Math.round(160+25*shp)},${0.55+0.4*shp})`;
+  const masts=s.gunsMax>=9?[L*0.26,0,-L*0.26]:[L*0.22,-L*0.2];
+  for(const mx of masts){
+    ctx.beginPath();ctx.arc(mx,0,1.6,0,TAU);ctx.fillStyle='#2a2018';ctx.fill();
+    ctx.save();ctx.translate(mx,0);ctx.rotate(0.12);
+    ctx.beginPath();
+    ctx.moveTo(2,-sailW/2);
+    ctx.quadraticCurveTo(-5-6*set,0,2,sailW/2);
+    ctx.lineTo(0,sailW/2);
+    ctx.quadraticCurveTo(-2-6*set,0,0,-sailW/2);
+    ctx.closePath();
+    ctx.fillStyle=cols;ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle=s.team==='p'?'#d9a441':'#c4583a';
+  ctx.fillRect(-L*0.5-1,-1.5,5,3);
+  if(s.struck){ctx.fillStyle='#e9dcbe';ctx.fillRect(masts[0],-9,8,5);}
+  if(s.rudderHP<=0){ctx.strokeStyle='rgba(196,88,58,.8)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(-L*0.5-4,-4);ctx.lineTo(-L*0.5+2,4);
+    ctx.moveTo(-L*0.5-4,4);ctx.lineTo(-L*0.5+2,-4);ctx.stroke();}
+  ctx.restore();
+}
+function draw(now){
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  const vw=innerWidth,vh=innerHeight;
+  const g=ctx.createLinearGradient(0,0,0,vh);
+  g.addColorStop(0,'#0d2630');g.addColorStop(1,'#0a1c25');
+  ctx.fillStyle=g;ctx.fillRect(0,0,vw,vh);
+  const cam={x:P().x,y:P().y};
+  ctx.save();ctx.translate(vw/2-cam.x,vh/2-cam.y);
+  const sp=92;
+  const x0=Math.floor((cam.x-vw/2)/sp)*sp,y0=Math.floor((cam.y-vh/2)/sp)*sp;
+  ctx.strokeStyle='rgba(233,220,190,.07)';ctx.lineWidth=1;
+  for(let gx=x0;gx<cam.x+vw/2+sp;gx+=sp)for(let gy=y0;gy<cam.y+vh/2+sp;gy+=sp){
+    const h=Math.sin(gx*12.9898+gy*78.233)*43758.5453;const ph=h-Math.floor(h);
+    const o=Math.sin(now*0.0012+ph*TAU)*3;
+    ctx.beginPath();ctx.arc(gx+o,gy+ph*30,5,Math.PI*0.15,Math.PI*0.85);ctx.stroke();
+  }
+  ctx.strokeStyle='rgba(233,220,190,.13)';
+  for(const s of streaks){
+    if(!paused){s.x+=Math.cos(wind.dir)*0.6;s.y+=Math.sin(wind.dir)*0.6;s.p+=0.004;if(s.p>1)s.p=0;}
+    if(s.x<cam.x-vw)s.x+=vw*2;if(s.x>cam.x+vw)s.x-=vw*2;
+    if(s.y<cam.y-vh)s.y+=vh*2;if(s.y>cam.y+vh)s.y-=vh*2;
+    const a=Math.sin(s.p*Math.PI);
+    ctx.globalAlpha=a*0.6;
+    ctx.beginPath();ctx.moveTo(s.x,s.y);
+    ctx.lineTo(s.x+Math.cos(wind.dir)*22,s.y+Math.sin(wind.dir)*22);ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  ctx.beginPath();ctx.arc(0,0,ARENA_R,0,TAU);
+  ctx.strokeStyle='rgba(196,88,58,.3)';ctx.setLineDash([14,18]);ctx.lineWidth=3;ctx.stroke();ctx.setLineDash([]);
+  for(const f of fx){
+    const k=f.life/f.max;
+    if(f.t==='wake'){ctx.beginPath();ctx.arc(f.x,f.y,f.r+(1-k)*10,0,TAU);
+      ctx.strokeStyle=`rgba(233,220,190,${0.16*k})`;ctx.lineWidth=1.5;ctx.stroke();}
+    if(f.t==='splash'){ctx.beginPath();ctx.arc(f.x,f.y,3+(1-k)*9,0,TAU);
+      ctx.strokeStyle=`rgba(180,210,215,${0.5*k})`;ctx.lineWidth=2;ctx.stroke();}
+  }
+  for(const b of balls){
+    const pulse=0.5+0.5*Math.sin(now*0.015);
+    ctx.beginPath();ctx.arc(b.lx,b.ly,5,0,TAU);
+    ctx.strokeStyle=b.team==='p'?`rgba(233,220,190,${0.22*pulse+0.08})`:`rgba(196,88,58,${0.3*pulse+0.12})`;
+    ctx.lineWidth=1.4;ctx.stroke();
+  }
+  for(const s of ships)if(s!==P())drawShip(s);
+  drawShip(P());
+  for(const b of balls){
+    const t=clamp(b.t/b.T,0,1);
+    const x=lerp(b.sx,b.lx,t),y=lerp(b.sy,b.ly,t);
+    const h=Math.sin(Math.PI*t);
+    ctx.beginPath();ctx.ellipse(x,y+2,2.4,1.3,0,0,TAU);
+    ctx.fillStyle='rgba(0,0,0,.3)';ctx.fill();
+    ctx.beginPath();ctx.arc(x,y-h*9,2.1+h*1.3,0,TAU);
+    ctx.fillStyle='#1c1712';ctx.fill();
+    ctx.strokeStyle='rgba(233,220,190,.4)';ctx.lineWidth=.8;ctx.stroke();
+  }
+  for(const f of fx){if(f.t==='smoke'){const k=f.life/f.max;
+    ctx.beginPath();ctx.arc(f.x,f.y,f.r+(1-k)*14,0,TAU);
+    ctx.fillStyle=`rgba(210,205,195,${0.30*k})`;ctx.fill();}}
+  for(const e of living('e')){
+    const ed=dist(P(),e);
+    if(ed>Math.min(vw,vh)*0.46){
+      const a=Math.atan2(e.y-P().y,e.x-P().x);
+      const px=P().x+Math.cos(a)*Math.min(vw,vh)*0.4,py=P().y+Math.sin(a)*Math.min(vw,vh)*0.4;
+      ctx.save();ctx.translate(px,py);ctx.rotate(a);
+      ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-4,-6);ctx.lineTo(-4,6);ctx.closePath();
+      ctx.fillStyle='rgba(196,88,58,.85)';ctx.fill();ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+function rudderWord(s){return s.rudderHP<=0?'Rudder shot away':s.rudderHP<50?'Rudder damaged':'Rudder sound';}
+function syncUI(){
+  const s=P(),foe=nearestEnemy(s);
+  $('ph').style.width=(s.hull/s.maxHull*100)+'%';
+  $('ps').style.width=s.sailHP+'%';
+  $('pc').style.width=(s.crew/s.maxCrew*100)+'%';
+  $('prud').textContent=rudderWord(s);
+  $('prud').style.color=s.rudderHP<50?'#c4583a':'';
+  if(foe){
+    const ux=-Math.cos(wind.dir),uy=-Math.sin(wind.dir);
+    const proj=(s.x-foe.x)*ux+(s.y-foe.y)*uy;
+    s.gauge=proj>40;
+    $('pgauge').style.display=s.gauge?'block':'none';
+  } else $('pgauge').style.display='none';
+  $('rosearrow').setAttribute('transform',`rotate(${(wind.dir*180/Math.PI+90).toFixed(1)} 27 27)`);
+  $('knots').textContent=(s.speed/14).toFixed(1)+' kn';
+  for(let i=0;i<2;i++){
+    const btn=$(i?'fstbd':'fport');
+    const cd=$(i?'cdstbd':'cdport');
+    const lbl=$(i?'lblstbd':'lblport');
+    const ready=s.reload[i]<=0;
+    cd.style.width=clamp(100-s.reload[i]/optReload*100,0,100)+'%';
+    lbl.textContent=(i?'STBD ':'PORT ')+s.gunsLeft[i];
+    btn.classList.toggle('ready',ready);
+    btn.classList.toggle('aim',ready&&inArc(s,foe,i));
+    btn.disabled=!ready||s.gunsLeft[i]<=0||phase!=='sail';
+  }
+  const hasFleet=living('p').length>1;
+  $('sigbtn').style.display=hasFleet?'block':'none';
+  $('orderbtn').style.display=hasFleet?'block':'none';
+  $('boardbtn').style.display=boardTarget()&&!paused?'block':'none';
+  syncChips();
+}
+
+let last=performance.now();
+function frame(now){
+  const dt=clamp((now-last)/1000,0,0.05);last=now;
+  if(!paused){
+    wind.dir=normAng(wind.dir+wind.drift*dt);
+    if(phase==='sail'){
+      const me=P();
+      me.rudder=(keys['a']||keys['arrowleft']||touchPort?-1:0)+(keys['d']||keys['arrowright']||touchStbd?1:0);
+      for(const s of ships)if(s!==me)updateAI(s,dt);
+      for(const s of ships)updateShip(s,dt);
+      updatePending(dt);
+      for(let i=0;i<ships.length;i++)for(let j=i+1;j<ships.length;j++){
+        const a=ships[i],b=ships[j];
+        if(a.dead||b.dead)continue;
+        const d=dist(a,b),minD=(a.beam+b.beam)*1.1;
+        if(d<minD&&d>0.01){
+          const nx=(a.x-b.x)/d,ny=(a.y-b.y)/d,push=(minD-d)*0.5;
+          a.x+=nx*push;a.y+=ny*push;b.x-=nx*push;b.y-=ny*push;
+          a.speed*=0.97;b.speed*=0.97;
+        }
+      }
+      for(let i=balls.length-1;i>=0;i--){
+        const b=balls[i];b.t+=dt;
+        if(b.t>=b.T){
+          let hit=null;
+          for(const s of ships){
+            if(s.team===b.team||s.dead||s.sinking>2)continue;
+            if(pointInShip(b.lx,b.ly,s)){hit=s;break;}
+          }
+          if(hit){applyHit(hit,b);fx.push({t:'smoke',x:b.lx,y:b.ly,r:5,life:0.6,max:0.6});}
+          else fx.push({t:'splash',x:b.lx,y:b.ly,life:0.7,max:0.7});
+          balls.splice(i,1);
+        }
+      }
+      checkOutcome();
+    } else if(phase==='board'){
+      updateBoarding(dt);
+      if(phase==='sail')checkOutcome();
+    } else {
+      for(const s of ships)updateShip(s,dt);
+    }
+    for(let i=fx.length-1;i>=0;i--){const f=fx[i];f.life-=dt;
+      if(f.vx){f.x+=f.vx*dt;f.y+=f.vy*dt;}
+      if(f.life<=0)fx.splice(i,1);}
+    updateFeed(dt);
+  }
+  draw(now);syncUI();
+  requestAnimationFrame(frame);
+}
+newBattle();
+feed('Esc opens the test menu — every dial lives there');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

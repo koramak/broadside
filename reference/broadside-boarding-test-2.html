@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Broadside — Boarding Test 2: Never Leave the Ship</title>
+<style>
+  :root{--ink:#0b1b22;--parch:#e9dcbe;--parch-dim:#b9ad8e;--rust:#c4583a;--gold:#d9a441}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--ink);font-family:Georgia,'Times New Roman',serif;color:var(--parch)}
+  #c{position:fixed;inset:0;display:block;touch-action:none}
+  .panel{position:fixed;background:rgba(11,27,34,.78);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:7px 10px}
+  .lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--parch-dim);font-family:'Courier New',monospace}
+  .num{font-family:'Courier New',monospace;font-size:13px}
+  .bar{width:150px;height:8px;background:rgba(233,220,190,.12);border-radius:3px;margin:3px 0 2px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;background:var(--gold);transition:width .25s}
+  #you{bottom:74px;left:12px}
+  #foe{top:12px;right:12px;text-align:right}
+  #title{top:12px;left:12px}
+  #title h1{font-size:14px;font-weight:normal;letter-spacing:.14em}
+  #title .sub{font-size:9px;font-family:'Courier New',monospace;color:var(--parch-dim)}
+  button{font-family:'Courier New',monospace;background:rgba(233,220,190,.08);border:1px solid rgba(233,220,190,.3);color:var(--parch);border-radius:6px;cursor:pointer;user-select:none;-webkit-user-select:none}
+  button:active{background:rgba(233,220,190,.22)}
+  button.on{background:rgba(217,164,65,.25);border-color:var(--gold)}
+  button:disabled{opacity:.35;cursor:default}
+  #abilities{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:7px}
+  #abilities button{padding:9px 11px;font-size:10px;letter-spacing:.06em}
+  #cutrun{border-color:var(--rust)}
+  #gear{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;font-size:15px;font-family:Georgia,serif}
+  #mode{position:fixed;bottom:62px;left:50%;transform:translateX(-50%);font-family:'Courier New',monospace;font-size:10px;color:var(--gold);letter-spacing:.08em;text-shadow:0 1px 4px #000;pointer-events:none}
+  #feed{position:fixed;top:58px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;font-family:'Courier New',monospace;font-size:11px;max-width:92vw}
+  #feed div{color:var(--gold);text-shadow:0 1px 4px #000;margin-top:2px;transition:opacity .5s}
+  #overlay,#menu{position:fixed;inset:0;background:rgba(7,16,20,.9);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;text-align:center;padding:16px;z-index:20;overflow-y:auto}
+  #overlay h1,#menu h1{font-size:26px;font-weight:normal;letter-spacing:.12em;font-family:Georgia,serif}
+  #overlay p{max-width:440px;color:var(--parch-dim);font-size:14px;line-height:1.5;font-family:Georgia,serif}
+  #overlay button,#menu .big{padding:11px 24px;font-size:13px;letter-spacing:.1em}
+  .selrow{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .selrow .lbl{margin-right:4px;width:130px;text-align:right}
+  .selrow button{padding:6px 11px;font-size:12px}
+  #menu .keys{font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim);line-height:1.7;max-width:460px;text-align:left}
+  @media (max-width:760px){
+    .bar{width:104px}
+    .selrow .lbl{width:auto;text-align:center}
+    #abilities button{padding:9px 7px;font-size:9px}
+    #you{bottom:120px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="panel" id="title">
+  <h1>BOARDING — LASHED</h1>
+  <div class="sub">drag a crew blob to send it · committed hands can't be recalled</div>
+</div>
+
+<div class="panel" id="you">
+  <div class="lbl">Your hands aboard / total</div>
+  <div class="num" id="pnum">—</div>
+  <div class="lbl">Nerve</div><div class="bar"><i id="pmor"></i></div>
+</div>
+
+<div class="panel" id="foe">
+  <div class="lbl">Defenders</div>
+  <div class="num" id="enum">—</div>
+</div>
+
+<button id="gear">⏸</button>
+<div id="feed"></div>
+<div id="mode"></div>
+
+<div id="abilities">
+  <button id="bswiv">SWIVEL ×3</button>
+  <button id="bmark">MARKSMEN</button>
+  <button id="bgrap">GRAPPLE ×2</button>
+  <button id="cutrun">CUT &amp; RUN</button>
+</div>
+
+<div id="menu">
+  <h1>NEVER LEAVE THE SHIP</h1>
+  <div class="selrow"><span class="lbl">Your crew</span>
+    <button data-pc="40">40</button><button data-pc="60" class="on">60</button><button data-pc="90">90</button>
+  </div>
+  <div class="selrow"><span class="lbl">Defenders</span>
+    <button data-ec="40">40</button><button data-ec="60" class="on">60</button><button data-ec="90">90</button>
+  </div>
+  <div class="selrow"><span class="lbl">Your reserve</span>
+    <button data-rv="0">None</button><button data-rv="0.25" class="on">A quarter</button><button data-rv="0.4">Almost half</button>
+  </div>
+  <div class="selrow"><span class="lbl">Marksmen aloft</span>
+    <button data-mk="0">0</button><button data-mk="8" class="on">8</button><button data-mk="14">14</button>
+  </div>
+  <button class="big" id="mresume">RESUME</button>
+  <button class="big" id="mrestart">RESTART WITH THESE SETTINGS</button>
+  <div class="keys">
+HOW IT WORKS
+· Drag from one of your blobs (or the RESERVE below your hull) and release on a deck section. Each drag sends a squad of ~10. Reserve goes ALL AT ONCE and kills your escape — that's the all-in.
+· Squads cross at grapple points. A defended rail caps how many of yours can fight at the foothold, so streams into a braced section get shredded. Local numbers win fights fast (and cheap).
+· MUSKETS: a section with a glint is loaded. When it levels (red flash) a volley is coming. After firing it shows a hollow ring — 6 seconds of open window. Time your streams into the window.
+· SWIVEL scatters a section for 3s (opens a window). MARKSMEN target a section and can drop its OFFICER (★) — officers stiffen morale and speed reloads.
+· Break a section's morale and it routs, panicking its neighbours. Cascades are how a smaller crew wins.
+· Take their QUARTERDECK and hold it to strike her colors. Lose your own, or lose your nerve, and the boarding is broken. They WILL cut idle grapples and counterattack.
+  </div>
+</div>
+
+<div id="overlay">
+  <h1 id="otitle">—</h1>
+  <p id="otext">—</p>
+  <button id="orestart">BOARD AGAIN</button>
+</div>
+
+<script>
+'use strict';
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rnd=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
+const $=id=>document.getElementById(id);
+const TAU=Math.PI*2;
+const dist2=(x1,y1,x2,y2)=>Math.hypot(x1-x2,y1-y2);
+
+const cv=$('c'),ctx=cv.getContext('2d');
+function resize(){cv.width=innerWidth*devicePixelRatio;cv.height=innerHeight*devicePixelRatio;
+  cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';layout();}
+addEventListener('resize',resize);
+
+let AC=null;
+function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();}
+function thud(vol=0.3,len=0.2,freq=500){
+  if(!AC)return;
+  const t=AC.currentTime,buf=AC.createBuffer(1,AC.sampleRate*len,AC.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+  const src=AC.createBufferSource();src.buffer=buf;
+  const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=freq;
+  const g=AC.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+len);
+  src.connect(f);f.connect(g);g.connect(AC.destination);src.start();
+}
+
+/* ---------- options ---------- */
+let optPC=60,optEC=60,optRes=0.25,optMark=8;
+
+/* ---------- layout ---------- */
+const COLS=['BOW','WAIST','QUARTERDECK'];
+let L={}; // geometry
+function layout(){
+  const vw=innerWidth,vh=innerHeight;
+  const W=Math.min(vw*0.86,620);
+  const hullH=Math.min(86,vh*0.13);
+  const gap=Math.min(46,vh*0.07);
+  const x=(vw-W)/2;
+  const cy=vh/2-14;
+  L={W,hullH,gap,x,
+    eY:cy-gap/2-hullH/2,   // enemy hull center
+    pY:cy+gap/2+hullH/2,   // player hull center
+    midY:cy,
+    colX:[x+W*0.18,x+W*0.5,x+W*0.82],
+    resX:x+W*0.5,resY:cy+gap/2+hullH+44};
+}
+
+/* ---------- state ---------- */
+let st=null,paused=false,feedItems=[];
+
+function newAction(){
+  layout();
+  const marks=Math.min(optMark,Math.floor(optPC*0.25));
+  const deckTotal=optPC-marks;
+  const resN=Math.round(deckTotal*optRes);
+  const onDeck=deckTotal-resN;
+  const per=onDeck/3;
+  st={
+    p:{
+      sec:[{h:per},{h:per},{h:per}],   // player hull sections (bow,waist,qd)
+      reserve:resN,resCommitted:false,
+      marks,morale:100,
+      swivel:3,swivelCd:0,markCd:0,grap:2,
+      aboard:[0,0,0],                  // player hands on ENEMY sections
+      total:optPC
+    },
+    e:{
+      sec:COLS.map((c,i)=>({
+        h:optEC*(i===0?0.30:i===1?0.34:0.36),
+        morale:100,officer:i>=1,routed:false,
+        musket:'loaded',mt:0,supT:0
+      })),
+      aboard:[0,0,0],                  // enemy hands on PLAYER sections
+      total:optEC,aiT:1.5
+    },
+    cross:[{open:false,t:0,state:'none'},{open:true,t:0,state:'open',idle:0},{open:false,t:0,state:'none'}],
+    squads:[],   // transit blobs {team,n,pts,seg,x,y,dest:{side,col}}
+    colorsT:0,theirColorsT:0,
+    mode:null,   // 'swivel'|'mark'|'grap'
+    drag:null,
+    foot:[0,0,0],     // foothold timers on enemy sections
+    pfoot:[0,0,0],    // foothold timers on player sections (enemy attacking)
+    over:false
+  };
+  feedItems=[];$('feed').innerHTML='';
+  $('overlay').style.display='none';
+  feed('The waist is lashed — send your first squad');
+  setMode(null);
+  setPaused(false);
+}
+
+function feed(msg){
+  const el=document.createElement('div');el.textContent=msg;
+  $('feed').appendChild(el);feedItems.push({el,t:3.6});
+  while(feedItems.length>3){const o=feedItems.shift();o.el.remove();}
+}
+function updateFeed(dt){
+  for(let i=feedItems.length-1;i>=0;i--){
+    const f=feedItems[i];f.t-=dt;
+    if(f.t<1)f.el.style.opacity=Math.max(0,f.t);
+    if(f.t<=0){f.el.remove();feedItems.splice(i,1);}
+  }
+}
+
+/* ---------- dispatch / pathing ---------- */
+function openCols(){return [0,1,2].filter(i=>st.cross[i].open);}
+function buildPath(fromSide,fromCol,toSide,toCol){
+  // fromSide/toSide: 'p'|'e'|'res'
+  const pts=[];
+  const yOf=s=>s==='p'?L.pY:L.eY;
+  if(fromSide==='res'){
+    pts.push({x:L.resX,y:L.resY});
+    pts.push({x:L.colX[1],y:L.pY});
+    fromSide='p';fromCol=1;
+  } else pts.push({x:L.colX[fromCol],y:yOf(fromSide)});
+  if(fromSide===toSide){
+    pts.push({x:L.colX[toCol],y:yOf(toSide)});
+    return pts;
+  }
+  // need a crossing
+  const oc=openCols();
+  if(!oc.length)return null;
+  let best=oc[0],bc=1e9;
+  for(const c of oc){const cost=Math.abs(c-fromCol)+Math.abs(c-toCol);if(cost<bc){bc=cost;best=c;}}
+  if(best!==fromCol)pts.push({x:L.colX[best],y:yOf(fromSide)});
+  pts.push({x:L.colX[best],y:L.midY});
+  pts.push({x:L.colX[best],y:yOf(toSide)});
+  if(best!==toCol)pts.push({x:L.colX[toCol],y:yOf(toSide)});
+  return pts;
+}
+function dispatch(team,fromSide,fromCol,n,toSide,toCol){
+  const pts=buildPath(fromSide,fromCol,toSide,toCol);
+  if(!pts)return false;
+  st.squads.push({team,n,pts,seg:0,x:pts[0].x,y:pts[0].y,dest:{side:toSide,col:toCol},prog:0});
+  return true;
+}
+function updateSquads(dt){
+  const SPD=78;
+  for(let i=st.squads.length-1;i>=0;i--){
+    const q=st.squads[i];
+    if(q.n<=0){st.squads.splice(i,1);continue;}
+    const a=q.pts[q.seg],b=q.pts[q.seg+1];
+    if(!b){ // arrived
+      arrive(q);st.squads.splice(i,1);continue;
+    }
+    const d=dist2(a.x,a.y,b.x,b.y)||1;
+    q.prog+=SPD*dt/d;
+    if(q.prog>=1){q.seg++;q.prog=0;q.x=b.x;q.y=b.y;}
+    else{q.x=lerp(a.x,b.x,q.prog);q.y=lerp(a.y,b.y,q.prog);}
+  }
+}
+function arrive(q){
+  const c=q.dest.col;
+  if(q.team==='p'){
+    if(q.dest.side==='e'){
+      if(st.p.aboard[c]<=0&&st.e.sec[c].h>0)st.foot[c]=2.0; // contested landing: foothold
+      st.p.aboard[c]+=q.n;
+    } else st.p.sec[c].h+=q.n;
+  } else {
+    if(q.dest.side==='p'){
+      if(st.e.aboard[c]<=0&&st.p.sec[c].h>0)st.pfoot[c]=2.0;
+      st.e.aboard[c]+=q.n;
+    } else st.e.sec[c].h+=q.n;
+  }
+}
+
+/* ---------- muskets / windows ---------- */
+function updateMuskets(dt){
+  st.e.sec.forEach((s,i)=>{
+    if(s.routed||s.h<=4){return;}
+    if(s.supT>0){s.supT-=dt;return;}
+    const reloadMul=s.officer?0.75:1;
+    const threat=st.p.aboard[i]>0||st.squads.some(q=>q.team==='p'&&q.dest.side==='e'&&q.dest.col===i&&dist2(q.x,q.y,L.colX[i],L.eY)<110);
+    if(s.musket==='loaded'){
+      if(threat){s.musket='aiming';s.mt=1.1;}
+    } else if(s.musket==='aiming'){
+      s.mt-=dt;
+      if(s.mt<=0){
+        // fire: hit nearest transit squad else hands aboard
+        let q=null,bd=1e9;
+        for(const sq of st.squads){
+          if(sq.team!=='p'||sq.dest.col!==i||sq.dest.side!=='e')continue;
+          const d=dist2(sq.x,sq.y,L.colX[i],L.eY);
+          if(d<140&&d<bd){bd=d;q=sq;}
+        }
+        const kills=Math.round(rnd(3,6));
+        if(q){q.n=Math.max(0,q.n-kills);}
+        else if(st.p.aboard[i]>0){st.p.aboard[i]=Math.max(0,st.p.aboard[i]-kills);}
+        st.p.morale=clamp(st.p.morale-kills*0.9,0,100);
+        feed('Volley from the '+COLS[i].toLowerCase()+'!');
+        thud(0.45,0.25,800);
+        s.musket='reload';s.mt=6*reloadMul;
+      }
+    } else { // reload
+      s.mt-=dt;
+      if(s.mt<=0)s.musket='loaded';
+    }
+  });
+}
+
+/* ---------- combat (Lanchester + chokes) ---------- */
+const K=0.16;
+function updateCombat(dt){
+  // fights on enemy deck
+  st.e.sec.forEach((s,i)=>{
+    if(s.routed)return;
+    let p=st.p.aboard[i],e=s.h;
+    if(p>0&&e>0){
+      let pEff=p,eMul=1;
+      if(st.foot[i]>0){pEff=Math.min(p,12);eMul=1.35;st.foot[i]-=dt;}
+      let eEff=e*(s.supT>0?0.5:1);
+      const eDead=K*pEff*dt,pDead=K*eEff*eMul*dt;
+      s.h=Math.max(0,e-eDead);
+      st.p.aboard[i]=Math.max(0,p-pDead);
+      st.p.morale=clamp(st.p.morale-pDead*1.0,0,100);
+      const morMul=s.officer?0.55:1;
+      s.morale=clamp(s.morale-(eDead*2.4+(p>e*2?7*dt:0))*morMul,0,100);
+      if(s.officer&&s.h<7){s.officer=false;s.morale-=15;feed('Their officer falls back — '+COLS[i].toLowerCase());}
+      if(s.morale<=0&&!s.routed)routSection(i);
+    }
+  });
+  // fights on player deck (counterattacks)
+  st.p.sec.forEach((s,i)=>{
+    let e=st.e.aboard[i],p=s.h;
+    if(e>0&&p>0){
+      let eEff=e,pMul=1;
+      if(st.pfoot[i]>0){eEff=Math.min(e,12);pMul=1.35;st.pfoot[i]-=dt;}
+      const pDead=K*eEff*dt,eDead=K*p*pMul*dt;
+      s.h=Math.max(0,p-pDead);
+      st.e.aboard[i]=Math.max(0,e-eDead);
+      st.p.morale=clamp(st.p.morale-pDead*1.3,0,100);
+    } else if(e>0&&p<=0){
+      // they hold your section
+    }
+  });
+}
+function routSection(i){
+  const s=st.e.sec[i];
+  s.routed=true;
+  feed('Their '+COLS[i].toLowerCase()+' breaks and runs!');
+  thud(0.5,0.4,250);
+  s.h=0;
+  [i-1,i+1].forEach(j=>{
+    if(j>=0&&j<3&&!st.e.sec[j].routed){
+      st.e.sec[j].morale=clamp(st.e.sec[j].morale-(st.e.sec[j].officer?14:26),0,100);
+      if(st.e.sec[j].morale<=0)routSection(j);
+    }
+  });
+}
+
+/* ---------- enemy AI ---------- */
+function updateAI(dt){
+  st.e.aiT-=dt;
+  if(st.e.aiT>0)return;
+  st.e.aiT=2.2;
+  const e=st.e;
+  // reinforce attacked sections from richest neighbour
+  for(let i=0;i<3;i++){
+    const s=e.sec[i];
+    if(s.routed)continue;
+    if(st.p.aboard[i]>0&&st.p.aboard[i]>s.h*0.8){
+      let from=-1,best=0;
+      [i-1,i+1].forEach(j=>{
+        if(j<0||j>2||e.sec[j].routed)return;
+        const spare=e.sec[j].h-(st.p.aboard[j]>0?99:(j===2?12:8));
+        if(spare>best){best=spare;from=j;}
+      });
+      if(from>=0&&best>=8){
+        const n=Math.min(14,Math.floor(best));
+        e.sec[from].h-=n;
+        dispatch('e','e',from,n,'e',i);
+        return;
+      }
+    }
+  }
+  // counterattack if strong and a crossing stands
+  const eDeck=e.sec.reduce((a,s)=>a+(s.routed?0:s.h),0);
+  const pCommitted=st.p.aboard[0]+st.p.aboard[1]+st.p.aboard[2]+
+    st.squads.filter(q=>q.team==='p').reduce((a,q)=>a+q.n,0);
+  const oc=openCols();
+  if(oc.length&&eDeck>Math.max(20,pCommitted*1.6)&&Math.random()<0.5){
+    const c=oc[Math.floor(rnd(oc.length))];
+    const s=e.sec[c];
+    if(!s.routed&&s.h>=20&&st.p.aboard[c]<=0){
+      const n=12;
+      s.h-=n;
+      dispatch('e','e',c,n,'p',c);
+      feed('They counterattack across the '+COLS[c].toLowerCase()+'!');
+      return;
+    }
+  }
+  // cut idle grapples when on the back foot
+  const pressured=st.p.aboard.some(v=>v>0)||st.p.morale>60&&pCommitted>eDeck*0.7;
+  for(const c of oc){
+    const s=e.sec[c];
+    if(s.routed||s.h<8)continue;
+    const busy=st.p.aboard[c]>0||st.squads.some(q=>Math.abs(q.x-L.colX[c])<24&&Math.abs(q.y-L.midY)<60);
+    st.cross[c].idle=busy?0:(st.cross[c].idle||0)+2.2;
+    if(!busy&&pressured&&st.cross[c].idle>4&&st.cross[c].state==='open'){
+      st.cross[c].state='cutting';st.cross[c].t=2.5;
+      feed('They\'re cutting the '+COLS[c].toLowerCase()+' grapples!');
+      return;
+    }
+  }
+}
+function updateCrossings(dt){
+  st.cross.forEach((c,i)=>{
+    if(c.state==='throwing'){c.t-=dt;if(c.t<=0){c.state='open';c.open=true;c.idle=0;feed('Grapples bite — the '+COLS[i].toLowerCase()+' is bridged');thud(0.35,0.3,300);}}
+    if(c.state==='cutting'){c.t-=dt;if(c.t<=0){c.state='none';c.open=false;feed('The '+COLS[i].toLowerCase()+' grapples part!');thud(0.4,0.3,200);}}
+  });
+}
+
+/* ---------- abilities ---------- */
+function setMode(m){
+  st.mode=m;
+  $('mode').textContent=m==='swivel'?'SWIVEL — tap an enemy section':
+    m==='mark'?'MARKSMEN — tap an enemy section':
+    m==='grap'?'GRAPPLE — tap the bow or quarterdeck rail':'';
+  $('bswiv').classList.toggle('on',m==='swivel');
+  $('bmark').classList.toggle('on',m==='mark');
+  $('bgrap').classList.toggle('on',m==='grap');
+}
+function useSwivel(i){
+  const s=st.e.sec[i];
+  st.p.swivel--;st.p.swivelCd=8;
+  s.supT=3;s.h=Math.max(0,s.h-rnd(2,4));
+  if(s.musket==='aiming')s.musket='reload',s.mt=6;
+  feed('Swivel rakes the '+COLS[i].toLowerCase()+' — they scatter');
+  thud(0.5,0.3,400);
+  setMode(null);
+}
+function useMarks(i){
+  const s=st.e.sec[i];
+  st.p.markCd=7;
+  const kills=Math.round(st.p.marks*rnd(0.12,0.25));
+  s.h=Math.max(0,s.h-kills);
+  if(s.officer&&Math.random()<0.3+st.p.marks*0.02){
+    s.officer=false;s.morale=clamp(s.morale-20,0,100);
+    feed('Marksmen drop their officer on the '+COLS[i].toLowerCase()+'!');
+    if(s.morale<=0)routSection(i);
+  } else feed('Musketry from the tops — '+kills+' down');
+  thud(0.35,0.2,900);
+  setMode(null);
+}
+function useGrap(i){
+  if(st.cross[i].open||st.cross[i].state==='throwing')return;
+  st.p.grap--;
+  st.cross[i].state='throwing';st.cross[i].t=3;
+  feed('Grapples away at the '+COLS[i].toLowerCase()+'…');
+  setMode(null);
+}
+function cutAndRun(){
+  if(st.p.resCommitted||st.over)return;
+  st.over=true;
+  const lost=st.p.total-handsAlive();
+  end('CUT AND RUN','You axe your own lines and sheer away. '+
+    Math.round(st.p.aboard[0]+st.p.aboard[1]+st.p.aboard[2])+' hands are abandoned on her deck. '+
+    'The bet is folded, the ship sails on.');
+}
+function handsAlive(){
+  return Math.round(st.p.sec.reduce((a,s)=>a+s.h,0)+st.p.reserve+st.p.marks+
+    st.p.aboard[0]+st.p.aboard[1]+st.p.aboard[2]+
+    st.squads.filter(q=>q.team==='p').reduce((a,q)=>a+q.n,0));
+}
+function enemyAlive(){
+  return Math.round(st.e.sec.reduce((a,s)=>a+(s.routed?0:s.h),0)+
+    st.e.aboard[0]+st.e.aboard[1]+st.e.aboard[2]+
+    st.squads.filter(q=>q.team==='e').reduce((a,q)=>a+q.n,0));
+}
+
+/* ---------- win / lose ---------- */
+function checkEnd(dt){
+  if(st.over)return;
+  const qd=st.e.sec[2];
+  if((qd.routed||qd.h<=0)&&st.p.aboard[2]>0){
+    st.colorsT+=dt;
+    if(st.colorsT>=3){
+      st.over=true;
+      end('SHE STRIKES','Your hands haul down her colors from the quarterdeck. '+
+        handsAlive()+' of your '+st.p.total+' remain to crew the prize.');
+      return;
+    }
+  } else st.colorsT=0;
+  if(st.p.sec[2].h<=0&&st.e.aboard[2]>0){
+    st.theirColorsT+=dt;
+    if(st.theirColorsT>=3){
+      st.over=true;
+      end('YOUR COLORS COME DOWN','They carry your own quarterdeck. The boarding you started ends on your deck.');
+      return;
+    }
+  } else st.theirColorsT=0;
+  if(st.p.morale<=0){
+    st.over=true;
+    end('YOUR NERVE BREAKS','The boarders waver, then run for the rail. The grapples are cut behind them.');
+    return;
+  }
+  if(enemyAlive()<=Math.max(4,st.e.total*0.1)){
+    st.over=true;
+    end('SHE STRIKES','Too few defenders left to hold a deck. The colors come down. '+
+      handsAlive()+' of your '+st.p.total+' remain.');
+  }
+}
+function end(title,text){
+  setTimeout(()=>{
+    $('otitle').textContent=title;
+    $('otext').textContent=text;
+    $('overlay').style.display='flex';
+  },700);
+}
+
+/* ---------- input ---------- */
+function canvasPos(e){return {x:e.clientX,y:e.clientY};}
+function hitSection(x,y){
+  for(let i=0;i<3;i++){
+    if(dist2(x,y,L.colX[i],L.eY)<52)return {side:'e',col:i};
+    if(dist2(x,y,L.colX[i],L.pY)<52)return {side:'p',col:i};
+  }
+  if(dist2(x,y,L.resX,L.resY)<44)return {side:'res',col:1};
+  for(let i=0;i<3;i++)if(dist2(x,y,L.colX[i],L.midY)<40)return {side:'rail',col:i};
+  return null;
+}
+cv.addEventListener('pointerdown',e=>{
+  audio();
+  if(paused||st.over)return;
+  const p=canvasPos(e),h=hitSection(p.x,p.y);
+  if(!h)return;
+  // ability targeting
+  if(st.mode){
+    if(st.mode==='swivel'&&h.side==='e'&&!st.e.sec[h.col].routed){useSwivel(h.col);return;}
+    if(st.mode==='mark'&&h.side==='e'&&!st.e.sec[h.col].routed){useMarks(h.col);return;}
+    if(st.mode==='grap'&&(h.side==='rail')&&h.col!==1&&!st.cross[h.col].open){useGrap(h.col);return;}
+    if(st.mode==='grap'&&h.side==='rail'){setMode(null);return;}
+  }
+  // start a drag from a friendly source
+  if(h.side==='p'&&st.p.sec[h.col].h>=1){st.drag={from:h,x:p.x,y:p.y};}
+  if(h.side==='res'&&st.p.reserve>0){st.drag={from:h,x:p.x,y:p.y};}
+});
+cv.addEventListener('pointermove',e=>{
+  if(st&&st.drag){const p=canvasPos(e);st.drag.x=p.x;st.drag.y=p.y;}
+});
+cv.addEventListener('pointerup',e=>{
+  if(!st||!st.drag)return;
+  const p=canvasPos(e),h=hitSection(p.x,p.y),d=st.drag;st.drag=null;
+  if(paused||st.over||!h)return;
+  if(h.side!=='p'&&h.side!=='e')return;
+  if(h.side==='e'&&!openCols().length){feed('No grapples hold — throw a line first');return;}
+  if(d.from.side==='res'){
+    const n=st.p.reserve;
+    if(n<=0)return;
+    st.p.reserve=0;st.p.resCommitted=true;
+    dispatch('p','res',1,n,h.side,h.col);
+    feed('THE RESERVE GOES IN — no way back now');
+    thud(0.5,0.4,220);
+  } else {
+    const sec=st.p.sec[d.from.col];
+    const n=Math.min(10,Math.floor(sec.h));
+    if(n<1)return;
+    if(d.from.side===h.side&&d.from.col===h.col)return;
+    sec.h-=n;
+    dispatch('p','p',d.from.col,n,h.side,h.col);
+  }
+});
+$('bswiv').addEventListener('click',()=>{audio();if(st.p.swivel>0&&st.p.swivelCd<=0)setMode(st.mode==='swivel'?null:'swivel');});
+$('bmark').addEventListener('click',()=>{audio();if(st.p.marks>0&&st.p.markCd<=0)setMode(st.mode==='mark'?null:'mark');});
+$('bgrap').addEventListener('click',()=>{audio();if(st.p.grap>0)setMode(st.mode==='grap'?null:'grap');});
+$('cutrun').addEventListener('click',()=>{audio();cutAndRun();});
+$('gear').addEventListener('click',()=>{audio();setPaused(!paused);});
+$('mresume').addEventListener('click',()=>setPaused(false));
+$('mrestart').addEventListener('click',()=>{audio();newAction();});
+$('orestart').addEventListener('click',()=>{audio();newAction();});
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='escape'||k==='p'){setPaused(!paused);}
+});
+function setPaused(v){paused=v;$('menu').style.display=v?'flex':'none';}
+function bindOpt(attr,fn){
+  document.querySelectorAll('['+attr+']').forEach(b=>b.addEventListener('click',()=>{
+    fn(b.getAttribute(attr));
+    document.querySelectorAll('['+attr+']').forEach(x=>x.classList.toggle('on',x===b));
+  }));
+}
+bindOpt('data-pc',v=>optPC=+v);
+bindOpt('data-ec',v=>optEC=+v);
+bindOpt('data-rv',v=>optRes=+v);
+bindOpt('data-mk',v=>optMark=+v);
+
+/* ---------- drawing ---------- */
+function drawBlob(x,y,n,color,now,seed){
+  const count=Math.min(24,Math.max(1,Math.round(n/2.5)));
+  ctx.fillStyle=color;
+  for(let i=0;i<count;i++){
+    const a=i*2.4+seed,r=3.5+Math.sqrt(i)*4.2;
+    const jx=Math.sin(now*0.002+i*1.7+seed)*1.2;
+    ctx.beginPath();
+    ctx.arc(x+Math.cos(a)*r+jx,y+Math.sin(a)*r*0.7,2.4,0,TAU);
+    ctx.fill();
+  }
+  // count badge
+  ctx.fillStyle='rgba(11,27,34,.85)';
+  ctx.beginPath();ctx.arc(x,y-20,9,0,TAU);ctx.fill();
+  ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle='#e9dcbe';ctx.font='9px Courier New';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(Math.ceil(n),x,y-20);
+}
+function drawHull(yc,W,h,x,fill){
+  ctx.fillStyle=fill;
+  ctx.beginPath();
+  ctx.moveTo(x-10,yc);
+  ctx.quadraticCurveTo(x+W*0.04,yc-h*0.55,x+W*0.5,yc-h*0.5);
+  ctx.quadraticCurveTo(x+W*0.96,yc-h*0.55,x+W+22,yc);
+  ctx.quadraticCurveTo(x+W*0.96,yc+h*0.55,x+W*0.5,yc+h*0.5);
+  ctx.quadraticCurveTo(x+W*0.04,yc+h*0.55,x-10,yc);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(233,220,190,.35)';ctx.lineWidth=1.4;ctx.stroke();
+}
+function draw(now){
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  const vw=innerWidth,vh=innerHeight;
+  const g=ctx.createLinearGradient(0,0,0,vh);
+  g.addColorStop(0,'#0d2630');g.addColorStop(1,'#0a1c25');
+  ctx.fillStyle=g;ctx.fillRect(0,0,vw,vh);
+  // hulls
+  drawHull(L.eY,L.W,L.hullH,L.x,'#4a3a3a');
+  drawHull(L.pY,L.W,L.hullH,L.x,'#5a4632');
+  // section dividers + labels
+  ctx.font='9px Courier New';ctx.textAlign='center';ctx.textBaseline='middle';
+  for(let i=0;i<3;i++){
+    ctx.fillStyle='rgba(233,220,190,.45)';
+    ctx.fillText(COLS[i],L.colX[i],L.eY-L.hullH*0.5-12);
+    ctx.fillText(COLS[i],L.colX[i],L.pY+L.hullH*0.5+12);
+  }
+  // crossings
+  for(let i=0;i<3;i++){
+    const c=st.cross[i],cx=L.colX[i];
+    if(c.open||c.state==='throwing'||c.state==='cutting'){
+      const frac=c.state==='throwing'?1-(c.t/3):c.state==='cutting'?(c.t/2.5):1;
+      ctx.strokeStyle=c.state==='cutting'?'rgba(196,88,58,.8)':'rgba(233,220,190,.55)';
+      ctx.lineWidth=1.4;
+      for(let r=-1;r<=1;r++){
+        ctx.globalAlpha=frac;
+        ctx.beginPath();
+        ctx.moveTo(cx+r*9,L.eY+L.hullH*0.42);
+        ctx.lineTo(cx+r*9+Math.sin(now*0.004+r)*2,L.pY-L.hullH*0.42);
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    } else {
+      // empty slot marker (grapple target)
+      ctx.strokeStyle='rgba(233,220,190,.15)';ctx.setLineDash([3,5]);ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(cx,L.eY+L.hullH*0.42);ctx.lineTo(cx,L.pY-L.hullH*0.42);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  // enemy sections
+  st.e.sec.forEach((s,i)=>{
+    const x=L.colX[i],y=L.eY;
+    if(!s.routed&&s.h>0.5){
+      drawBlob(x,y,s.h,s.supT>0?'rgba(196,88,58,.45)':'rgba(196,88,58,.8)',now,i*7);
+      // officer
+      if(s.officer){ctx.fillStyle='#e9dcbe';ctx.font='11px Georgia';ctx.fillText('★',x+24,y-14);}
+      // morale bar
+      ctx.fillStyle='rgba(233,220,190,.15)';ctx.fillRect(x-18,y+26,36,3);
+      ctx.fillStyle=s.morale>40?'#d9a441':'#c4583a';ctx.fillRect(x-18,y+26,36*s.morale/100,3);
+      // musket state
+      ctx.font='10px Courier New';
+      if(s.supT>0){ctx.fillStyle='#d9a441';ctx.fillText('✶ scattered',x,y-36);}
+      else if(s.musket==='aiming'){
+        const f=0.5+0.5*Math.sin(now*0.03);
+        ctx.fillStyle=`rgba(196,88,58,${0.5+0.5*f})`;ctx.fillText('▲ LEVELED',x,y-36);
+      } else if(s.musket==='reload'){
+        ctx.fillStyle='rgba(233,220,190,.6)';ctx.fillText('○ reloading '+s.mt.toFixed(0),x,y-36);
+      } else {ctx.fillStyle='rgba(233,220,190,.35)';ctx.fillText('· loaded',x,y-36);}
+    } else if(s.routed){
+      ctx.fillStyle='rgba(196,88,58,.4)';ctx.font='9px Courier New';
+      ctx.fillText('ROUTED',x,y);
+    }
+    // player hands fighting aboard
+    if(st.p.aboard[i]>0.5)drawBlob(x-14,y+12,st.p.aboard[i],'rgba(217,164,65,.85)',now,i*3+40);
+    // colors progress on their quarterdeck
+    if(i===2&&st.colorsT>0){
+      ctx.strokeStyle='#d9a441';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(x,y,30,-Math.PI/2,-Math.PI/2+TAU*(st.colorsT/3));ctx.stroke();
+      ctx.fillStyle='#d9a441';ctx.font='9px Courier New';ctx.fillText('STRIKING…',x,y-44);
+    }
+  });
+  // player sections
+  st.p.sec.forEach((s,i)=>{
+    const x=L.colX[i],y=L.pY;
+    if(s.h>0.5)drawBlob(x,y,s.h,'rgba(217,164,65,.85)',now,i*5+11);
+    if(st.e.aboard[i]>0.5)drawBlob(x+14,y-12,st.e.aboard[i],'rgba(196,88,58,.85)',now,i*9+70);
+    if(i===2&&st.theirColorsT>0){
+      ctx.strokeStyle='#c4583a';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(x,y,30,-Math.PI/2,-Math.PI/2+TAU*(st.theirColorsT/3));ctx.stroke();
+    }
+  });
+  // reserve
+  if(st.p.reserve>0){
+    ctx.fillStyle='rgba(233,220,190,.4)';ctx.font='9px Courier New';
+    ctx.fillText('RESERVE — all or nothing',L.resX,L.resY+30);
+    drawBlob(L.resX,L.resY,st.p.reserve,'rgba(217,164,65,.7)',now,99);
+  } else if(st.p.resCommitted){
+    ctx.fillStyle='rgba(196,88,58,.6)';ctx.font='9px Courier New';
+    ctx.fillText('NO WAY BACK',L.resX,L.resY);
+  }
+  // marksmen note
+  if(st.p.marks>0){
+    ctx.fillStyle='rgba(233,220,190,.35)';ctx.font='9px Courier New';ctx.textAlign='left';
+    ctx.fillText(st.p.marks+' marksmen aloft',L.x,L.pY+L.hullH*0.5+30);
+    ctx.textAlign='center';
+  }
+  // transit squads
+  for(const q of st.squads){
+    drawBlob(q.x,q.y,q.n,q.team==='p'?'rgba(217,164,65,.9)':'rgba(196,88,58,.9)',now,31);
+  }
+  // drag arrow
+  if(st.drag){
+    const f=st.drag.from;
+    const fx=f.side==='res'?L.resX:L.colX[f.col];
+    const fy=f.side==='res'?L.resY:L.pY;
+    ctx.strokeStyle='rgba(217,164,65,.7)';ctx.lineWidth=2;ctx.setLineDash([5,5]);
+    ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(st.drag.x,st.drag.y);ctx.stroke();
+    ctx.setLineDash([]);
+    const n=f.side==='res'?st.p.reserve:Math.min(10,Math.floor(st.p.sec[f.col].h));
+    ctx.fillStyle='#d9a441';ctx.font='11px Courier New';
+    ctx.fillText('+'+Math.ceil(n),st.drag.x,st.drag.y-16);
+  }
+}
+
+/* ---------- UI / loop ---------- */
+function syncUI(){
+  const aboard=Math.round(st.p.aboard[0]+st.p.aboard[1]+st.p.aboard[2]);
+  $('pnum').textContent=aboard+' / '+handsAlive()+' hands';
+  $('enum').textContent=enemyAlive()+' hands';
+  $('pmor').style.width=st.p.morale+'%';
+  $('bswiv').textContent='SWIVEL ×'+st.p.swivel+(st.p.swivelCd>0?' ('+st.p.swivelCd.toFixed(0)+')':'');
+  $('bswiv').disabled=st.p.swivel<=0||st.p.swivelCd>0||st.over;
+  $('bmark').textContent='MARKSMEN'+(st.p.markCd>0?' ('+st.p.markCd.toFixed(0)+')':'');
+  $('bmark').disabled=st.p.marks<=0||st.p.markCd>0||st.over;
+  $('bgrap').textContent='GRAPPLE ×'+st.p.grap;
+  $('bgrap').disabled=st.p.grap<=0||st.over;
+  $('cutrun').disabled=st.p.resCommitted||st.over;
+  $('cutrun').textContent=st.p.resCommitted?'NO WAY BACK':'CUT & RUN';
+}
+let last=performance.now();
+function frame(now){
+  const dt=clamp((now-last)/1000,0,0.05);last=now;
+  if(!paused&&!st.over){
+    st.p.swivelCd=Math.max(0,st.p.swivelCd-dt);
+    st.p.markCd=Math.max(0,st.p.markCd-dt);
+    updateSquads(dt);
+    updateMuskets(dt);
+    updateCombat(dt);
+    updateAI(dt);
+    updateCrossings(dt);
+    updateFeed(dt);
+    checkEnd(dt);
+  }
+  draw(now);syncUI();
+  requestAnimationFrame(frame);
+}
+resize();
+newAction();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

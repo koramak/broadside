@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Broadside — Boarding Test 3: The Deck Is a Chessboard</title>
+<style>
+  :root{--ink:#0b1b22;--parch:#e9dcbe;--parch-dim:#b9ad8e;--rust:#c4583a;--gold:#d9a441;--sea:#16323c}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--ink);font-family:Georgia,'Times New Roman',serif;color:var(--parch)}
+  #c{position:fixed;inset:0;display:block;touch-action:none}
+  .panel{position:fixed;background:rgba(11,27,34,.78);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:7px 10px}
+  .lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--parch-dim);font-family:'Courier New',monospace}
+  .num{font-family:'Courier New',monospace;font-size:12px;line-height:1.5}
+  #title{top:12px;left:12px}
+  #title h1{font-size:14px;font-weight:normal;letter-spacing:.14em}
+  #title .sub{font-size:9px;font-family:'Courier New',monospace;color:var(--parch-dim)}
+  #info{top:12px;right:12px;text-align:right;max-width:200px}
+  button{font-family:'Courier New',monospace;background:rgba(233,220,190,.08);border:1px solid rgba(233,220,190,.3);color:var(--parch);border-radius:6px;cursor:pointer;user-select:none;-webkit-user-select:none}
+  button:active{background:rgba(233,220,190,.22)}
+  button.on{background:rgba(217,164,65,.25);border-color:var(--gold)}
+  button:disabled{opacity:.3;cursor:default}
+  #actions{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:7px;flex-wrap:wrap;justify-content:center;max-width:96vw}
+  #actions button{padding:10px 13px;font-size:10px;letter-spacing:.06em}
+  #bend{border-color:var(--gold)}
+  #bcut{border-color:var(--rust)}
+  #gear{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;font-size:15px;font-family:Georgia,serif}
+  #feed{position:fixed;top:58px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;font-family:'Courier New',monospace;font-size:11px;max-width:92vw;z-index:5}
+  #feed div{color:var(--gold);text-shadow:0 1px 4px #000;margin-top:2px;transition:opacity .5s}
+  #unitcard{position:fixed;bottom:64px;left:12px;display:none;max-width:215px}
+  #unitcard .nm{font-size:12px;letter-spacing:.06em}
+  #unitcard .st{font-size:9px;font-family:'Courier New',monospace;color:var(--parch-dim);line-height:1.6}
+  #overlay,#menu{position:fixed;inset:0;background:rgba(7,16,20,.9);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;text-align:center;padding:16px;z-index:20;overflow-y:auto}
+  #overlay h1,#menu h1{font-size:26px;font-weight:normal;letter-spacing:.12em;font-family:Georgia,serif}
+  #overlay p{max-width:440px;color:var(--parch-dim);font-size:14px;line-height:1.5;font-family:Georgia,serif}
+  #overlay button,#menu .big{padding:11px 24px;font-size:13px;letter-spacing:.1em}
+  .selrow{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .selrow .lbl{margin-right:4px;width:120px;text-align:right}
+  .selrow button{padding:6px 11px;font-size:12px}
+  #menu .keys{font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim);line-height:1.7;max-width:470px;text-align:left}
+  @media (max-width:760px){
+    .selrow .lbl{width:auto;text-align:center}
+    #info{max-width:150px}
+    #unitcard{bottom:110px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="panel" id="title">
+  <h1>THE DECK IS A CHESSBOARD</h1>
+  <div class="sub">strength is health is damage · every enemy shows its hand</div>
+</div>
+
+<div class="panel" id="info">
+  <div class="lbl">Round</div><div class="num" id="round">1</div>
+  <div class="lbl">Rally pool</div><div class="num" id="pool">—</div>
+</div>
+
+<button id="gear">⏸</button>
+<div id="feed"></div>
+
+<div class="panel" id="unitcard">
+  <div class="nm" id="ucn">—</div>
+  <div class="st" id="ucs">—</div>
+</div>
+
+<div id="actions">
+  <button id="battack">STRIKE</button>
+  <button id="bshoot">MUSKET</button>
+  <button id="bshove">SHOVE</button>
+  <button id="brally">RALLY</button>
+  <button id="bbrace">BRACE</button>
+  <button id="bend">END TURN</button>
+  <button id="bcut">CUT &amp; RUN</button>
+</div>
+
+<div id="menu">
+  <h1>BOARDING — THE CHESSBOARD</h1>
+  <div class="selrow"><span class="lbl">Defenders</span>
+    <button data-en="5">Light (5)</button><button data-en="7" class="on">Standard (7)</button><button data-en="9">Heavy (9)</button>
+  </div>
+  <div class="selrow"><span class="lbl">Your crew</span>
+    <button data-sc="0.8">Thin (-20%)</button><button data-sc="1" class="on">Full</button><button data-sc="1.2">Stacked (+20%)</button>
+  </div>
+  <button class="big" id="mresume">RESUME</button>
+  <button class="big" id="mrestart">RESTART WITH THESE SETTINGS</button>
+  <div class="keys">
+HOW IT WORKS
+· Your pieces are squads. The number on each piece is its STRENGTH — its health AND its damage. A mauled squad hits soft. Melee damage = attacker strength minus defender armor (the small shield number).
+· Tap a piece, tap a blue tile to move (move is optional), then act: STRIKE an adjacent enemy, or use the piece's special. One move + one action each, then END TURN.
+· EVERY enemy shows its plan: an arrow to where it will move, and a red ✕ on the tile it will strike. The ✕ hits the TILE — step out of it, or shove someone else into it.
+· The dark water between the hulls kills anything that enters it. The BOSUN can SHOVE enemies one tile — into the gap, into each other, into their own volleys.
+· The CAPTAIN can RALLY: feed hands from your reserve pool into an adjacent squad. The MARINE shoots at range 3 (then reloads a turn).
+· Their tops fire a VOLLEY every third round — marked tiles burn anything standing there. Their hatch spawns reinforcements (telegraphed). Their OFFICER hardens nearby armor; drop him and watch them soften.
+· WIN: end a round standing on their colors (⚑) with no enemy beside you, or clear the deck. LOSE: lose every piece. CUT &amp; RUN ends it any time — at a price.
+  </div>
+</div>
+
+<div id="overlay">
+  <h1 id="otitle">—</h1>
+  <p id="otext">—</p>
+  <button id="orestart">BOARD AGAIN</button>
+</div>
+
+<script>
+'use strict';
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rnd=(a=1,b)=>b===undefined?Math.random()*a:a+Math.random()*(b-a);
+const $=id=>document.getElementById(id);
+const TAU=Math.PI*2;
+
+const cv=$('c'),ctx=cv.getContext('2d');
+function resize(){cv.width=innerWidth*devicePixelRatio;cv.height=innerHeight*devicePixelRatio;
+  cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';layout();}
+addEventListener('resize',resize);
+
+let AC=null;
+function audio(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();}
+function thud(vol=0.3,len=0.2,freq=500){
+  if(!AC)return;
+  const t=AC.currentTime,buf=AC.createBuffer(1,AC.sampleRate*len,AC.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+  const src=AC.createBufferSource();src.buffer=buf;
+  const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=freq;
+  const g=AC.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+len);
+  src.connect(f);f.connect(g);g.connect(AC.destination);src.start();
+}
+
+/* ---------- board ----------
+rows 0-1: enemy deck · row 2: the gap (water) · rows 3-4: your deck
+planks bridge the gap at columns 2 and 6
+*/
+const GW=9,GH=5;
+const PLANKS=[2,6];
+const MASTS=[[4,0],[4,4]];
+const COLORS_T=[8,0];   // their colors
+const HATCH=[0,0];      // their reinforcement hatch
+let optEN=7,optSC=1;
+let L={};
+function layout(){
+  const vw=innerWidth,vh=innerHeight;
+  const ts=Math.min((vw-30)/GW,(vh-200)/GH,64);
+  L={ts,ox:(vw-ts*GW)/2,oy:(vh-ts*GH)/2-26};
+}
+function tx(c){return L.ox+c*L.ts+L.ts/2;}
+function ty(r){return L.oy+r*L.ts+L.ts/2;}
+function tileType(c,r){
+  if(c<0||c>=GW||r<0||r>=GH)return 'void';
+  if(r===2)return PLANKS.includes(c)?'plank':'gap';
+  if(MASTS.some(m=>m[0]===c&&m[1]===r))return 'mast';
+  if(c===COLORS_T[0]&&r===COLORS_T[1])return 'colors';
+  if(c===HATCH[0]&&r===HATCH[1])return 'hatch';
+  return r<2?'edeck':'pdeck';
+}
+function passable(c,r){const t=tileType(c,r);return t==='edeck'||t==='pdeck'||t==='plank'||t==='colors'||t==='hatch';}
+
+/* ---------- state ---------- */
+let st=null,paused=false,feedItems=[];
+let UID=0;
+function mkUnit(o){return Object.assign({id:++UID,braced:false,acted:false,moved:false,reload:false,maxStr:o.str},o);}
+
+function newAction(){
+  layout();
+  const sc=optSC;
+  st={
+    units:[],round:1,phase:'player',sel:null,mode:null,
+    pool:Math.round(12*sc),plans:[],volley:[],spawnAt:null,over:false,movTiles:[],colorsHeld:false
+  };
+  const S=v=>Math.max(4,Math.round(v*sc));
+  st.units.push(mkUnit({team:'p',name:'Capt. Reyes',kind:'captain',str:S(10),armor:4,mov:3,c:3,r:4,desc:'RALLY: feed reserve hands into an adjacent squad (+up to 5 str)'}));
+  st.units.push(mkUnit({team:'p',name:'Bosun Okafor',kind:'bosun',str:S(12),armor:3,mov:3,c:2,r:3,desc:'SHOVE: push an adjacent enemy one tile. The gap drowns them.'}));
+  st.units.push(mkUnit({team:'p',name:'Marine Voss',kind:'marine',str:S(8),armor:3,mov:2,c:5,r:4,desc:'MUSKET: range 3, 4 damage ignoring armor. Reloads a turn after.'}));
+  st.units.push(mkUnit({team:'p',name:'Boarders (fore)',kind:'squad',str:S(14),armor:2,mov:3,c:1,r:3,desc:'Plain steel. Strength is everything.'}));
+  st.units.push(mkUnit({team:'p',name:'Boarders (aft)',kind:'squad',str:S(14),armor:2,mov:3,c:6,r:3,desc:'Plain steel. Strength is everything.'}));
+  // defenders
+  const spots=[[1,0],[2,1],[3,1],[5,1],[6,0],[6,1],[7,1],[2,0],[7,0]];
+  const kinds=['deckhand','deckhand','marine','deckhand','officer','deckhand','marine','deckhand','deckhand'];
+  for(let i=0;i<optEN;i++){
+    const k=kinds[i],sp=spots[i];
+    if(k==='officer')st.units.push(mkUnit({team:'e',name:'Their Officer',kind:'officer',str:12,armor:5,mov:2,c:sp[0],r:sp[1],desc:'+2 armor to adjacent defenders. Drop him.'}));
+    else if(k==='marine')st.units.push(mkUnit({team:'e',name:'Marine',kind:'emarine',str:8,armor:4,mov:2,c:sp[0],r:sp[1],desc:'Shoots at range 3.'}));
+    else st.units.push(mkUnit({team:'e',name:'Deckhands',kind:'deckhand',str:10,armor:2,mov:3,c:sp[0],r:sp[1],desc:'Numbers and knives.'}));
+  }
+  feedItems=[];$('feed').innerHTML='';
+  $('overlay').style.display='none';
+  planEnemies();
+  feed('Their whole plan is on the board — solve it');
+  setPaused(false);
+  syncButtons();
+}
+
+function feed(msg){
+  const el=document.createElement('div');el.textContent=msg;
+  $('feed').appendChild(el);feedItems.push({el,t:3.6});
+  while(feedItems.length>3){const o=feedItems.shift();o.el.remove();}
+}
+function updateFeed(dt){
+  for(let i=feedItems.length-1;i>=0;i--){
+    const f=feedItems[i];f.t-=dt;
+    if(f.t<1)f.el.style.opacity=Math.max(0,f.t);
+    if(f.t<=0){f.el.remove();feedItems.splice(i,1);}
+  }
+}
+
+/* ---------- helpers ---------- */
+const unitAt=(c,r)=>st.units.find(u=>u.c===c&&u.r===r&&u.str>0);
+const livingP=()=>st.units.filter(u=>u.team==='p'&&u.str>0);
+const livingE=()=>st.units.filter(u=>u.team==='e'&&u.str>0);
+const manh=(a,b)=>Math.abs(a.c-b.c)+Math.abs(a.r-b.r);
+function armorOf(u){
+  let a=u.armor+(u.braced?3:0);
+  if(u.team==='e'){
+    for(const o of st.units)if(o.kind==='officer'&&o.str>0&&o!==u&&manh(o,u)===1)a+=2;
+  }
+  return a;
+}
+function bfs(u,range){
+  const seen={},out=[];
+  const key=(c,r)=>c+','+r;
+  const q=[{c:u.c,r:u.r,d:0}];seen[key(u.c,u.r)]=true;
+  while(q.length){
+    const n=q.shift();
+    if(n.d>0)out.push(n);
+    if(n.d>=range)continue;
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dc,dr])=>{
+      const c=n.c+dc,r=n.r+dr;
+      if(!passable(c,r)||seen[key(c,r)])return;
+      if(unitAt(c,r))return;
+      seen[key(c,r)]=true;
+      q.push({c,r,d:n.d+1});
+    });
+  }
+  return out;
+}
+function damage(att,def){return Math.max(1,att.str-armorOf(def));}
+function hurt(u,dmg,why){
+  u.str-=dmg;
+  if(u.str<=0){
+    u.str=0;
+    feed((u.team==='p'?'':'')+u.name+' '+(why||'is cut down'));
+    thud(0.45,0.3,250);
+    if(u.kind==='officer'){
+      for(const e of livingE())if(manh(e,u)===1){e.str=Math.max(1,e.str-3);}
+      feed('Their officer is down — the line wavers');
+    }
+  } else thud(0.3,0.15,600);
+}
+function drown(u){
+  u.str=0;
+  feed(u.name+' goes into the gap — drowned between the hulls');
+  thud(0.5,0.45,180);
+}
+
+/* ---------- enemy planning (perfect information) ---------- */
+function planEnemies(){
+  st.plans=[];
+  // volley telegraph every 3rd round
+  st.volley=[];
+  if(st.round%3===0){
+    const ps=livingP();
+    ps.slice(0,3).forEach(p=>st.volley.push({c:p.c,r:p.r}));
+    if(st.volley.length)feed('Their tops take aim — marked tiles will burn');
+  }
+  // hatch spawn telegraph
+  st.spawnAt=(st.round===3||st.round===7)&&!unitAt(HATCH[0],HATCH[1])?{c:HATCH[0],r:HATCH[1]}:null;
+  if(st.spawnAt)feed('Boots on the ladder — reinforcements at their hatch');
+  const taken={};
+  for(const e of livingE()){
+    // nearest player piece
+    let tgt=null,bd=1e9;
+    for(const p of livingP()){const d=manh(e,p);if(d<bd){bd=d;tgt=p;}}
+    if(!tgt){st.plans.push({e,dest:{c:e.c,r:e.r},strike:null});continue;}
+    const isRanged=e.kind==='emarine';
+    // candidate destinations
+    const opts=[{c:e.c,r:e.r,d:0}].concat(bfs(e,e.mov)).filter(o=>!taken[o.c+','+o.r]);
+    let best=null,score=-1e9;
+    for(const o of opts){
+      const dd=Math.abs(o.c-tgt.c)+Math.abs(o.r-tgt.r);
+      let s=isRanged?-(Math.abs(dd-2)):-dd;     // ranged keeps distance ~2
+      if(o.r===2&&!PLANKS.includes(o.c))s-=999;
+      if(best===null||s>score){score=s;best=o;}
+    }
+    taken[best.c+','+best.r]=true;
+    // lock a strike TILE
+    let strike=null;
+    const from={c:best.c,r:best.r};
+    if(isRanged){
+      if(Math.abs(from.c-tgt.c)+Math.abs(from.r-tgt.r)<=3)strike={c:tgt.c,r:tgt.r,ranged:true};
+    } else {
+      if(Math.abs(from.c-tgt.c)+Math.abs(from.r-tgt.r)===1)strike={c:tgt.c,r:tgt.r,ranged:false};
+      else {
+        // strike an adjacent tile toward target if it would be reachable
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dc,dr])=>{
+          const c=from.c+dc,r=from.r+dr;
+          if(strike)return;
+          if(c===tgt.c&&r===tgt.r)strike={c,r,ranged:false};
+        });
+      }
+    }
+    st.plans.push({e,dest:best,strike});
+  }
+}
+
+/* ---------- enemy execution ---------- */
+function enemyPhase(){
+  st.phase='enemy';
+  // volley resolves first
+  for(const v of st.volley){
+    const u=unitAt(v.c,v.r);
+    if(u){hurt(u,5,'is torn by the volley');feed('Volley strikes '+u.name);}
+  }
+  st.volley=[];
+  // spawn
+  if(st.spawnAt&&!unitAt(st.spawnAt.c,st.spawnAt.r)){
+    st.units.push(mkUnit({team:'e',name:'Fresh deckhands',kind:'deckhand',str:10,armor:2,mov:3,c:st.spawnAt.c,r:st.spawnAt.r,desc:'Up from below.'}));
+    feed('Reinforcements pour from the hatch');
+  }
+  st.spawnAt=null;
+  // execute plans
+  for(const pl of st.plans){
+    const e=pl.e;
+    if(e.str<=0)continue;
+    // move (re-path if dest occupied)
+    if(!unitAt(pl.dest.c,pl.dest.r)||pl.dest.c===e.c&&pl.dest.r===e.r){
+      if(passable(pl.dest.c,pl.dest.r)){e.c=pl.dest.c;e.r=pl.dest.r;}
+    }
+    // strike the locked tile
+    if(pl.strike){
+      const inRange=pl.strike.ranged?
+        (Math.abs(e.c-pl.strike.c)+Math.abs(e.r-pl.strike.r)<=3):
+        (Math.abs(e.c-pl.strike.c)+Math.abs(e.r-pl.strike.r)===1);
+      if(inRange){
+        const u=unitAt(pl.strike.c,pl.strike.r);
+        if(u){
+          const dmg=pl.strike.ranged?3:damage(e,u);
+          hurt(u,dmg,u.team==='e'?'is cut down by their own!':'falls under their steel');
+          if(u.team==='e')feed('They strike their own man in the press!');
+        } else feed(e.name+' strikes at empty air');
+      }
+    }
+  }
+  // cleanup + next round
+  st.units=st.units.filter(u=>u.str>0);
+  for(const u of st.units){u.acted=false;u.moved=false;u.braced=false;if(u.kind==='marine'&&u.reload==='spent')u.reload=true;else u.reload=false;}
+  st.round++;
+  st.phase='player';
+  st.sel=null;st.mode=null;st.movTiles=[];
+  checkEnd();
+  if(!st.over)planEnemies();
+  syncButtons();
+}
+
+/* ---------- win / lose ---------- */
+function checkEnd(){
+  if(st.over)return;
+  if(!livingP().length){
+    st.over=true;
+    end('THE BOARDING FAILS','Every piece you sent is dead or in the water. The grapples are cut behind you.');
+    return;
+  }
+  if(!livingE().length){
+    st.over=true;
+    end('DECK CLEARED','Not a defender left standing. The colors come down by your hand. '+
+      Math.round(livingP().reduce((a,u)=>a+u.str,0))+' hands stand on her deck.');
+    return;
+  }
+  // colors: a player piece on ⚑ with no enemy adjacent at round end
+  const onColors=livingP().find(u=>u.c===COLORS_T[0]&&u.r===COLORS_T[1]);
+  if(onColors&&!livingE().some(e=>manh(e,onColors)===1)){
+    st.over=true;
+    end('SHE STRIKES',onColors.name+' hauls down her colors from the quarterdeck while the defenders look on, beaten.');
+  }
+}
+function end(title,text){
+  setTimeout(()=>{
+    $('otitle').textContent=title;
+    $('otext').textContent=text;
+    $('overlay').style.display='flex';
+  },600);
+}
+function cutAndRun(){
+  if(st.over)return;
+  st.over=true;
+  end('CUT AND RUN','You call the retreat. The pieces still standing scramble back over the rail. The bet is folded.');
+}
+
+/* ---------- player actions ---------- */
+function select(u){
+  st.sel=u;st.mode=null;
+  st.movTiles=(u&&u.team==='p'&&!u.acted&&!u.moved)?bfs(u,u.mov):[];
+  syncButtons();
+}
+function tryMove(c,r){
+  const u=st.sel;
+  if(!u||u.moved||u.acted)return false;
+  if(!st.movTiles.some(t=>t.c===c&&t.r===r))return false;
+  u.c=c;u.r=r;u.moved=true;st.movTiles=[];
+  syncButtons();
+  return true;
+}
+function adjEnemies(u){return livingE().filter(e=>manh(e,u)===1);}
+function doStrike(target){
+  const u=st.sel;
+  hurt(target,damage(u,target));
+  u.acted=true;st.mode=null;select(null);
+  checkEnd();
+}
+function doShoot(target){
+  const u=st.sel;
+  hurt(target,4,'is shot from across the deck');
+  u.reload='spent';u.acted=true;st.mode=null;select(null);
+  checkEnd();
+}
+function doShove(target){
+  const u=st.sel;
+  const dc=target.c-u.c,dr=target.r-u.r;
+  const nc=target.c+dc,nr=target.r+dr;
+  const t=tileType(nc,nr);
+  if(t==='gap'){target.c=nc;target.r=nr;drown(target);st.units=st.units.filter(x=>x.str>0);}
+  else if(!passable(nc,nr)||unitAt(nc,nr)){hurt(target,3,'is slammed against the ship');const o=unitAt(nc,nr);if(o&&o!==target)hurt(o,2);}
+  else {target.c=nc;target.r=nr;feed(target.name+' is shoved across the deck');thud(0.35,0.2,350);}
+  u.acted=true;st.mode=null;select(null);
+  checkEnd();
+}
+function doRally(target){
+  const u=st.sel;
+  const give=Math.min(5,st.pool,target.maxStr-target.str+5);
+  if(give<=0){feed('Nothing left in the pool');return;}
+  st.pool-=give;target.str+=give;target.maxStr=Math.max(target.maxStr,target.str);
+  feed('+'+give+' hands rally to '+target.name);
+  thud(0.3,0.2,400);
+  u.acted=true;st.mode=null;select(null);
+}
+function doBrace(){
+  const u=st.sel;
+  u.braced=true;u.acted=true;st.mode=null;select(null);
+  feed(u.name+' braces — +3 armor this round');
+}
+function endTurn(){
+  if(st.over||paused)return;
+  st.sel=null;st.mode=null;st.movTiles=[];
+  checkEnd();
+  if(!st.over)enemyPhase();
+}
+
+/* ---------- input ---------- */
+cv.addEventListener('pointerdown',e=>{
+  audio();
+  if(paused||st.over||st.phase!=='player')return;
+  const c=Math.floor((e.clientX-L.ox)/L.ts),r=Math.floor((e.clientY-L.oy)/L.ts);
+  const u=unitAt(c,r);
+  if(st.mode&&st.sel){
+    if(st.mode==='strike'&&u&&u.team==='e'&&manh(u,st.sel)===1){doStrike(u);return;}
+    if(st.mode==='shoot'&&u&&u.team==='e'&&manh(u,st.sel)<=3){doShoot(u);return;}
+    if(st.mode==='shove'&&u&&u.team==='e'&&manh(u,st.sel)===1){doShove(u);return;}
+    if(st.mode==='rally'&&u&&u.team==='p'&&u!==st.sel&&manh(u,st.sel)===1){doRally(u);return;}
+    st.mode=null;syncButtons();return;
+  }
+  if(u&&u.team==='p'){select(u);return;}
+  if(st.sel&&!u&&tryMove(c,r))return;
+  select(null);
+});
+function setMode(m){
+  if(!st.sel||st.sel.acted)return;
+  st.mode=st.mode===m?null:m;
+  syncButtons();
+}
+$('battack').addEventListener('click',()=>{audio();setMode('strike');});
+$('bshoot').addEventListener('click',()=>{audio();setMode('shoot');});
+$('bshove').addEventListener('click',()=>{audio();setMode('shove');});
+$('brally').addEventListener('click',()=>{audio();setMode('rally');});
+$('bbrace').addEventListener('click',()=>{audio();if(st.sel&&!st.sel.acted)doBrace();});
+$('bend').addEventListener('click',()=>{audio();endTurn();});
+$('bcut').addEventListener('click',()=>{audio();cutAndRun();});
+$('gear').addEventListener('click',()=>{audio();setPaused(!paused);});
+$('mresume').addEventListener('click',()=>setPaused(false));
+$('mrestart').addEventListener('click',()=>{audio();newAction();});
+$('orestart').addEventListener('click',()=>{audio();newAction();});
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='escape'||k==='p')setPaused(!paused);
+  if(k==='enter'&&!paused)endTurn();
+});
+function setPaused(v){paused=v;$('menu').style.display=v?'flex':'none';}
+function bindOpt(attr,fn){
+  document.querySelectorAll('['+attr+']').forEach(b=>b.addEventListener('click',()=>{
+    fn(b.getAttribute(attr));
+    document.querySelectorAll('['+attr+']').forEach(x=>x.classList.toggle('on',x===b));
+  }));
+}
+bindOpt('data-en',v=>optEN=+v);
+bindOpt('data-sc',v=>optSC=+v);
+
+/* ---------- buttons sync ---------- */
+function syncButtons(){
+  const u=st.sel;
+  const can=u&&u.team==='p'&&!u.acted&&!st.over;
+  $('battack').disabled=!can||!adjEnemies(u).length;
+  $('battack').classList.toggle('on',st.mode==='strike');
+  $('bshoot').style.display=u&&u.kind==='marine'?'block':'none';
+  $('bshoot').disabled=!can||u.reload===true||!livingE().some(e=>manh(e,u)<=3);
+  $('bshoot').classList.toggle('on',st.mode==='shoot');
+  $('bshoot').textContent=u&&u.reload===true?'RELOADING':'MUSKET';
+  $('bshove').style.display=u&&u.kind==='bosun'?'block':'none';
+  $('bshove').disabled=!can||!adjEnemies(u).length;
+  $('bshove').classList.toggle('on',st.mode==='shove');
+  $('brally').style.display=u&&u.kind==='captain'?'block':'none';
+  $('brally').disabled=!can||st.pool<=0||!livingP().some(p=>p!==u&&manh(p,u)===1);
+  $('brally').classList.toggle('on',st.mode==='rally');
+  $('bbrace').disabled=!can;
+  $('bcut').disabled=st.over;
+  // unit card
+  if(u){
+    $('unitcard').style.display='block';
+    $('ucn').textContent=u.name;
+    $('ucs').innerHTML='STR '+u.str+' · ARMOR '+armorOf(u)+' · MOVE '+u.mov+
+      (u.acted?' · DONE':u.moved?' · moved':'')+'<br>'+u.desc;
+  } else $('unitcard').style.display='none';
+}
+
+/* ---------- drawing ---------- */
+function drawPiece(u,now){
+  const x=tx(u.c),y=ty(u.r);
+  const col=u.team==='p'?'rgba(217,164,65,':'rgba(196,88,58,';
+  const dots=Math.min(12,Math.max(1,Math.round(u.str/1.5)));
+  // base (diorama puck)
+  ctx.fillStyle=u.team==='p'?'#3a3226':'#33272a';
+  ctx.beginPath();ctx.ellipse(x,y+6,L.ts*0.32,L.ts*0.14,0,0,TAU);ctx.fill();
+  ctx.strokeStyle=col+(st.sel===u?'1)':'0.5)');ctx.lineWidth=st.sel===u?2:1;ctx.stroke();
+  // figures
+  ctx.fillStyle=col+(u.acted?'0.45)':'0.9)');
+  for(let i=0;i<dots;i++){
+    const a=i*2.4+u.id,r=2.5+Math.sqrt(i)*3.4;
+    ctx.beginPath();
+    ctx.arc(x+Math.cos(a)*r,y+Math.sin(a)*r*0.6-2,2.6,0,TAU);
+    ctx.fill();
+  }
+  if(u.kind==='officer'||u.kind==='captain'){
+    ctx.fillStyle='#e9dcbe';ctx.font='10px Georgia';ctx.textAlign='center';
+    ctx.fillText('★',x,y-L.ts*0.26);
+  }
+  // str badge
+  ctx.fillStyle='rgba(11,27,34,.9)';
+  ctx.beginPath();ctx.arc(x-L.ts*0.26,y-L.ts*0.22,9,0,TAU);ctx.fill();
+  ctx.strokeStyle=col+'0.9)';ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle='#e9dcbe';ctx.font='bold 10px Courier New';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(u.str,x-L.ts*0.26,y-L.ts*0.22);
+  // armor badge
+  ctx.fillStyle='rgba(11,27,34,.9)';
+  ctx.beginPath();ctx.arc(x+L.ts*0.26,y-L.ts*0.22,7,0,TAU);ctx.fill();
+  ctx.strokeStyle='rgba(233,220,190,.5)';ctx.stroke();
+  ctx.fillStyle='#b9ad8e';ctx.font='8px Courier New';
+  ctx.fillText(armorOf(u),x+L.ts*0.26,y-L.ts*0.22);
+  if(u.braced){ctx.fillStyle='#b9ad8e';ctx.font='8px Courier New';ctx.fillText('BRACED',x,y+L.ts*0.3);}
+}
+function draw(now){
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  const vw=innerWidth,vh=innerHeight;
+  const g=ctx.createLinearGradient(0,0,0,vh);
+  g.addColorStop(0,'#0d2630');g.addColorStop(1,'#0a1c25');
+  ctx.fillStyle=g;ctx.fillRect(0,0,vw,vh);
+  // tiles
+  for(let r=0;r<GH;r++)for(let c=0;c<GW;c++){
+    const t=tileType(c,r),x=L.ox+c*L.ts,y=L.oy+r*L.ts;
+    if(t==='gap'){
+      ctx.fillStyle='#10262e';
+      ctx.fillRect(x,y,L.ts,L.ts);
+      ctx.strokeStyle='rgba(180,210,215,.15)';ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.arc(x+L.ts*0.5+Math.sin(now*0.002+c)*4,y+L.ts*0.55,5,Math.PI*0.15,Math.PI*0.85);
+      ctx.stroke();
+      continue;
+    }
+    if(t==='void')continue;
+    ctx.fillStyle=t==='plank'?'#6a5238':(r<2?'#4a3a3a':'#5a4632');
+    ctx.fillRect(x+1,y+1,L.ts-2,L.ts-2);
+    // planking lines
+    ctx.strokeStyle='rgba(0,0,0,.15)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x+1,y+L.ts*0.5);ctx.lineTo(x+L.ts-1,y+L.ts*0.5);ctx.stroke();
+    ctx.strokeStyle='rgba(233,220,190,.1)';
+    ctx.strokeRect(x+1,y+1,L.ts-2,L.ts-2);
+    if(t==='mast'){
+      ctx.fillStyle='#2a2018';
+      ctx.beginPath();ctx.arc(x+L.ts/2,y+L.ts/2,L.ts*0.2,0,TAU);ctx.fill();
+      ctx.strokeStyle='rgba(233,220,190,.3)';ctx.stroke();
+    }
+    if(t==='colors'){
+      ctx.fillStyle='#c4583a';
+      ctx.font=(L.ts*0.4)+'px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('⚑',x+L.ts/2,y+L.ts/2);
+    }
+    if(t==='hatch'){
+      ctx.strokeStyle='rgba(233,220,190,.35)';ctx.lineWidth=1.5;
+      ctx.strokeRect(x+L.ts*0.25,y+L.ts*0.25,L.ts*0.5,L.ts*0.5);
+    }
+  }
+  // move highlights
+  for(const t of st.movTiles){
+    ctx.fillStyle='rgba(126,168,170,.22)';
+    ctx.fillRect(L.ox+t.c*L.ts+2,L.oy+t.r*L.ts+2,L.ts-4,L.ts-4);
+  }
+  // volley telegraphs
+  for(const v of st.volley){
+    const f=0.5+0.5*Math.sin(now*0.008);
+    ctx.strokeStyle=`rgba(196,88,58,${0.4+0.4*f})`;ctx.lineWidth=2;
+    ctx.strokeRect(L.ox+v.c*L.ts+4,L.oy+v.r*L.ts+4,L.ts-8,L.ts-8);
+    ctx.fillStyle=`rgba(196,88,58,${0.5+0.4*f})`;ctx.font='9px Courier New';ctx.textAlign='center';
+    ctx.fillText('VOLLEY',tx(v.c),ty(v.r)-L.ts*0.34);
+  }
+  // spawn telegraph
+  if(st.spawnAt){
+    const f=0.5+0.5*Math.sin(now*0.006);
+    ctx.strokeStyle=`rgba(217,164,65,${0.3+0.4*f})`;ctx.lineWidth=2;
+    ctx.strokeRect(L.ox+st.spawnAt.c*L.ts+4,L.oy+st.spawnAt.r*L.ts+4,L.ts-8,L.ts-8);
+  }
+  // enemy intents
+  for(const pl of st.plans){
+    if(pl.e.str<=0)continue;
+    const x1=tx(pl.e.c),y1=ty(pl.e.r),x2=tx(pl.dest.c),y2=ty(pl.dest.r);
+    if(pl.dest.c!==pl.e.c||pl.dest.r!==pl.e.r){
+      ctx.strokeStyle='rgba(196,88,58,.45)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
+      const a=Math.atan2(y2-y1,x2-x1);
+      ctx.fillStyle='rgba(196,88,58,.6)';
+      ctx.beginPath();ctx.moveTo(x2,y2);
+      ctx.lineTo(x2-Math.cos(a-0.4)*8,y2-Math.sin(a-0.4)*8);
+      ctx.lineTo(x2-Math.cos(a+0.4)*8,y2-Math.sin(a+0.4)*8);
+      ctx.closePath();ctx.fill();
+    }
+    if(pl.strike){
+      const f=0.5+0.5*Math.sin(now*0.01);
+      ctx.strokeStyle=`rgba(196,88,58,${0.55+0.4*f})`;ctx.lineWidth=2;
+      const sx=tx(pl.strike.c),sy=ty(pl.strike.r),k=L.ts*0.16;
+      ctx.beginPath();
+      ctx.moveTo(sx-k,sy-k);ctx.lineTo(sx+k,sy+k);
+      ctx.moveTo(sx-k,sy+k);ctx.lineTo(sx+k,sy-k);
+      ctx.stroke();
+    }
+  }
+  // pieces
+  for(const u of st.units)if(u.str>0)drawPiece(u,now);
+  // targeting hints
+  if(st.mode&&st.sel){
+    const u=st.sel;
+    const targets=st.mode==='rally'?livingP().filter(p=>p!==u&&manh(p,u)===1):
+      st.mode==='shoot'?livingE().filter(e=>manh(e,u)<=3):
+      adjEnemies(u);
+    for(const t of targets){
+      const f=0.5+0.5*Math.sin(now*0.012);
+      ctx.strokeStyle=st.mode==='rally'?`rgba(217,164,65,${0.6+0.4*f})`:`rgba(196,88,58,${0.6+0.4*f})`;
+      ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(tx(t.c),ty(t.r),L.ts*0.4,0,TAU);ctx.stroke();
+    }
+  }
+  // deck labels
+  ctx.fillStyle='rgba(233,220,190,.35)';ctx.font='9px Courier New';ctx.textAlign='left';
+  ctx.fillText('THEIR DECK',L.ox,L.oy-8);
+  ctx.fillText('YOUR DECK',L.ox,L.oy+GH*L.ts+14);
+}
+
+/* ---------- loop ---------- */
+function syncUI(){
+  $('round').textContent=st.round+(st.round%3===0?' · VOLLEY':st.round%3===2?' · volley next':'');
+  $('pool').textContent=st.pool+' hands';
+}
+let last=performance.now();
+function frame(now){
+  const dt=clamp((now-last)/1000,0,0.05);last=now;
+  if(!paused)updateFeed(dt);
+  draw(now);syncUI();
+  requestAnimationFrame(frame);
+}
+resize();
+newAction();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

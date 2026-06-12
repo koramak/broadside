@@ -1,0 +1,75 @@
+/* Parchment / ink / gold / rust UI language, ported from the prototypes. */
+:root{--ink:#0b1b22;--parch:#e9dcbe;--parch-dim:#b9ad8e;--rust:#c4583a;--gold:#d9a441}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--ink);font-family:Georgia,'Times New Roman',serif;color:var(--parch)}
+#c{position:fixed;inset:0;display:block;touch-action:none}
+.panel{position:fixed;background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:8px 10px}
+.lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--parch-dim);font-family:'Courier New',monospace}
+.shipname{font-size:13px;letter-spacing:.06em;margin-bottom:4px}
+.bar{width:140px;height:7px;background:rgba(233,220,190,.12);border-radius:3px;margin:3px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;transition:width .15s}
+.hull i{background:var(--rust)} .sail i{background:var(--parch)} .crew i{background:var(--gold)}
+.sub{font-size:9px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.08em}
+#pstat{top:12px;left:12px;z-index:5}
+#fleet{bottom:96px;left:12px;display:flex;flex-direction:column;gap:6px;background:none;border:none;padding:0;position:fixed;z-index:5}
+.chip{background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:5px 8px;width:168px}
+.chip .nm{font-size:11px}
+.chip .tr{font-size:8px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.06em}
+.chip .bar{width:100%;height:4px;margin:3px 0}
+.chip button{font-size:9px;padding:2px 7px;float:right;margin-top:-2px;font-family:'Courier New',monospace}
+.chip.dead{opacity:.4}
+#estat{top:12px;right:12px;display:flex;flex-direction:column;gap:6px;background:none;border:none;padding:0;align-items:flex-end;position:fixed;z-index:5}
+#estat .chip{width:150px}
+#windbox{top:12px;left:50%;transform:translateX(-50%);text-align:center;padding:6px 14px;z-index:5}
+#rose{width:48px;height:48px;margin:2px auto;position:relative}
+#rose svg{position:absolute;inset:0}
+#knots{font-family:'Courier New',monospace;font-size:11px;color:var(--parch-dim)}
+#battleno{font-family:'Courier New',monospace;font-size:9px;color:var(--gold);letter-spacing:.1em}
+#pausebtn{position:fixed;top:14px;left:calc(50% + 62px);width:36px;height:36px;font-size:15px;border-radius:50%;font-family:Georgia,serif;z-index:5}
+button{font-family:'Courier New',monospace;background:rgba(233,220,190,.08);border:1px solid rgba(233,220,190,.3);color:var(--parch);border-radius:6px;cursor:pointer;user-select:none;-webkit-user-select:none}
+button:active{background:rgba(233,220,190,.22)}
+button.on{background:rgba(217,164,65,.25);border-color:var(--gold)}
+button:disabled{opacity:.35;cursor:default}
+#feed{position:fixed;top:112px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.05em;max-width:90vw;z-index:5}
+#feed div{color:var(--gold);text-shadow:0 1px 4px #000;margin-top:3px;transition:opacity .5s}
+#ammo{bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px;position:fixed;background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;z-index:5}
+#ammo button{padding:8px 11px;font-size:11px}
+#ammo .k{font-size:9px;color:var(--parch-dim);display:block}
+#helm{bottom:14px;left:188px;display:flex;gap:8px;align-items:flex-end;padding:8px;z-index:5}
+#helm button{width:54px;height:54px;font-size:20px;font-family:Georgia,serif}
+#sailctl{display:flex;flex-direction:column;gap:4px;align-items:center}
+#sailctl button{width:54px;height:24px;font-size:13px}
+#sailset{font-size:9px;letter-spacing:.1em;font-family:'Courier New',monospace;color:var(--parch-dim)}
+#guns{bottom:14px;right:12px;display:flex;gap:8px;padding:8px;align-items:flex-end;z-index:5}
+.fbtn{width:84px;height:56px;position:relative;overflow:hidden;font-size:11px;letter-spacing:.06em}
+.fbtn .cd{position:absolute;left:0;bottom:0;top:0;background:rgba(217,164,65,.18);width:0%}
+.fbtn span{position:relative}
+.fbtn.ready{border-color:var(--gold)}
+.fbtn.aim{background:rgba(196,88,58,.28);border-color:var(--rust)}
+#gunscol{display:flex;flex-direction:column;gap:6px}
+#sigbtn,#orderbtn{width:84px;height:30px;font-size:9px;letter-spacing:.04em}
+#sigbtn{border-color:var(--gold)}
+#boardbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
+#hint{bottom:84px;left:50%;transform:translateX(-50%);font-size:10px;font-family:'Courier New',monospace;color:var(--parch-dim);background:none;border:none;text-align:center;position:fixed;z-index:5}
+#overlay,#pausemenu,#harbor{position:fixed;inset:0;background:rgba(7,16,20,.92);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;text-align:center;padding:16px;z-index:20;overflow-y:auto}
+#overlay h1,#pausemenu h1,#harbor h1{font-size:26px;font-weight:normal;letter-spacing:.12em}
+#overlay p{max-width:440px;color:var(--parch-dim);font-size:14px;line-height:1.5}
+#overlay button,#pausemenu .big,#harbor .big{padding:11px 24px;font-size:13px;letter-spacing:.1em}
+#runstats{font-family:'Courier New',monospace;font-size:11px;color:var(--gold)}
+#pausemenu .keys{font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim);line-height:1.7;max-width:400px}
+/* harbor */
+#harbor{justify-content:flex-start;padding-top:36px}
+.hrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:760px}
+.hcard{background:rgba(11,27,34,.85);border:1px solid rgba(233,220,190,.25);border-radius:8px;padding:10px 12px;width:225px;text-align:left}
+.hcard h3{font-size:12px;font-weight:normal;letter-spacing:.1em;margin-bottom:4px}
+.hcard .d{font-size:10px;font-family:'Courier New',monospace;color:var(--parch-dim);line-height:1.6;margin-bottom:6px}
+.hcard button{display:block;width:100%;margin-top:4px;padding:7px;font-size:10px;text-align:left}
+#hstores{font-family:'Courier New',monospace;font-size:12px;color:var(--gold)}
+#hnext{border-color:var(--gold);background:rgba(217,164,65,.18)}
+@media (max-width:760px){
+  .bar{width:100px} #hint{display:none}
+  #helm{left:12px;bottom:170px} #fleet{bottom:auto;top:150px}
+  .chip{width:140px} #ammo{bottom:90px}
+  #boardbtn{bottom:230px} #feed{top:124px;font-size:10px}
+  .hcard{width:86vw}
+}
