@@ -141,6 +141,17 @@ export class World {
     });
   }
 
+  /** Rebuild the chart ship as a new class after a flagship trade-up. Keeps
+   *  her pose so the swap is seamless; the caller rebuilds her mesh. */
+  rebuildPlayer(run: RunState): void {
+    const fs = flagStats(run);
+    const old = this.player;
+    this.player = makeShip(run.flag.cls, 'p', old.x, old.y, old.heading, fs);
+    this.player.speed = old.speed;
+    this.player.sailIdx = old.sailIdx;
+    this.syncPlayerFromRun(run);
+  }
+
   /** Map-ship condition mirrors the persistent flagship. */
   syncPlayerFromRun(run: RunState): void {
     const fs = flagStats(run);

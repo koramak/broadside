@@ -82,6 +82,13 @@ function enterMap(): void {
   $('overlay').style.display = 'none';
   worldView?.setVisible(true);
   if (world) {
+    // a flagship trade-up changes the hull class: rebuild the chart ship + mesh
+    if (world.player.cls !== run.flag.cls) {
+      world.rebuildPlayer(run);
+      if (playerMapView) playerMapView.dispose(shell.scene);
+      playerMapView = new ShipView(world.player, lib);
+      shell.scene.add(playerMapView.group);
+    }
     world.syncPlayerFromRun(run);
     if (playerMapView) playerMapView.group.visible = true;
     shell.snapTo(world.player.x, world.player.y);

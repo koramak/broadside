@@ -197,6 +197,24 @@ export class HarborScreen {
         }
       }
 
+      // hoist your flag aboard her — the trade-up. Bigger or smaller, your call.
+      const hoist = document.createElement('button');
+      hoist.textContent =
+        'HOIST YOUR FLAG — sail her as flagship (your ' + CLASSES[run.flag.cls].name +
+        ' is sold, +' + PRIZE_VALUE[run.flag.cls] + ' stores)';
+      hoist.addEventListener('click', () => {
+        audio();
+        const oldName = CLASSES[run.flag.cls].name;
+        if (runOps.hoistFlag(run, i) !== null) {
+          this.onFeed(
+            'You strike your own colors and run them up the ' + CLASSES[p.cls].name +
+            '. The ' + oldName + ' is paid off down the coast — but Persistence sails on with you.',
+          );
+        }
+        this.render(run, rng);
+      });
+      card.appendChild(hoist);
+
       const strip = document.createElement('button');
       strip.textContent = 'STRIP HER — ' + loot[1] + ' (+12 stores)';
       strip.disabled = run.up[loot[0]] >= 3;

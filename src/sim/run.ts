@@ -5,7 +5,7 @@ import { CAPTAINS, CLASSES, CREW_COST, PRIZE_VALUE, STRIP_LOOT } from './constan
 import type { ClassDef, ShipClass } from './constants';
 import type { FactionKey } from './worldgen';
 import { ISLANDS, WORLD, knownPorts, unrevealedSecrets } from './worldgen';
-import { GOODS } from './economy';
+import { GOODS, clampCargo } from './economy';
 import { clamp } from './math';
 import { Rng } from './rng';
 import type { EventQueue } from './events';
@@ -325,4 +325,37 @@ export function sellPrize(run: RunState, i: number): boolean {
   run.stores += PRIZE_VALUE[p.cls];
   run.pendingPrizes.splice(i, 1);
   return true;
+}
+
+/* ============ flagship trade-up ============ */
+
+/** A freshly struck hull is worn, not pristine — you inherit her condition. */
+export const HOIST_HULL_PCT = 0.6;
+
+/**
+ * Hoist your flag aboard a captured hull — the climactic trade-up the loop was
+ * missing. Your veteran crew rows across (a bigger hull means thinner ranks
+ * until you muster) and your hard-won refits re-rig onto her. She comes as she
+ * was taken: knocked about, guns intact. The old flagship is paid off down the
+ * coast for her prize value — but the name "Persistence" sails on with you.
+ * Returns the OLD class so the caller can rebuild the map ship + its mesh.
+ */
+export function hoistFlag(run: RunState, prizeIdx: number): ShipClass | null {
+  const p = run.pendingPrizes[prizeIdx];
+  if (!p) return null;
+  const oldCls = run.flag.cls;
+  const crewAboard = run.flag.crewPct * CLASSES[oldCls].crew;
+  const newCrewPct = clamp(crewAboard / CLASSES[p.cls].crew, 0, 1);
+  run.stores += PRIZE_VALUE[oldCls]; // the old hull is sold off down the coast
+  run.flag = {
+    cls: p.cls,
+    hullPct: HOIST_HULL_PCT,
+    sailHP: 100,
+    crewPct: newCrewPct,
+    rudderHP: 100,
+    gunDef: [0, 0],
+  };
+  run.pendingPrizes.splice(prizeIdx, 1);
+  clampCargo(run); // a smaller hull may have to dump cargo (cap shrank)
+  return oldCls;
 }
