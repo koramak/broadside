@@ -33,6 +33,9 @@ export function newRun(): RunState {
     cargo: { sugar: 0, rum: 0, powder: 0, timber: 0, silk: 0, spice: 0 },
     // you fly no colors the Crown recognizes; the Brethren half-trust you
     rep: { crown: -10, compania: 0, brethren: 15 },
+    contracts: [],
+    jobBoard: [],
+    nextContractId: 1,
   };
 }
 

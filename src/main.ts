@@ -26,6 +26,7 @@ import { Minimap, BigMap } from './ui/minimap';
 import { audio, boom, setMusic, boardTick, boardFoul, woodHit, splash } from './audio';
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 import { refreshRumors } from './sim/economy';
+import { deliverAtPort, generateBoard } from './sim/contracts';
 import { PORTS } from './sim/worldgen';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -285,6 +286,10 @@ portScreen.onLeave = () => {
 portScreen.onShipChanged = () => {
   if (world) world.syncPlayerFromRun(run);
 };
+portScreen.onFeed = (m) => {
+  hud.feed(m);
+  chronicle(run, m);
+};
 
 function enterPort(port: NonNullable<World['canDock']>): void {
   mode = 'port';
@@ -292,6 +297,9 @@ function enterPort(port: NonNullable<World['canDock']>): void {
     onDocked(run, port.id, world.events);
     // the tavern talks the moment you tie up
     refreshRumors(run, PORTS, port.id, world.day);
+    // settle any cargo contracts that end here, then post fresh work
+    deliverAtPort(run, port.id, world.day, world.events);
+    run.jobBoard = generateBoard(run, port, world.day);
     // pool hands walk aboard free — replenishing crew at port is automatic
     const before = run.pool;
     if (topUpCrew(run)) {
@@ -507,6 +515,13 @@ function frame(now: number): void {
       if (obj) {
         const m = objectivePos(obj);
         targets.push({ x: m.x, y: m.y, color: 'rgba(217,164,65,.9)' });
+      }
+      // a cyan mark for each cargo contract's destination port
+      for (const c of run.contracts) {
+        if ((c.type === 'delivery' || c.type === 'smuggle') && c.destPortId) {
+          const dp = PORTS.find((p) => p.id === c.destPortId);
+          if (dp) targets.push({ x: dp.x, y: dp.y, color: 'rgba(120,190,200,.9)' });
+        }
       }
       hud.syncOffscreen(shell.camera, targets);
       minimap?.sync(world, run, simTime);

@@ -18,6 +18,8 @@ import {
 import type { ContactSpec, FactionKey, PortDef } from './worldgen';
 import { currentObjective, objectivePos, onStoryWon, tutorialActive } from './objectives';
 import { EASY } from './easing';
+import { activeBounty, completeBounty, expireContracts } from './contracts';
+import type { Contract } from './contracts';
 import type { GoodKey } from './economy';
 
 export interface Contact {
@@ -33,6 +35,8 @@ export interface Contact {
   huntCooldown?: number;
   /** one-shot flag so boundary refusals only feed once */
   brokeOff?: boolean;
+  /** if set, this contact is a contract's quarry — defeating her settles it */
+  bountyId?: number;
 }
 
 export interface Crate {
@@ -55,6 +59,8 @@ export interface EncounterSpec {
   names?: string[];
   x: number;
   y: number;
+  /** ties a bounty contract to the fight it's settled by */
+  bountyId?: number;
 }
 
 const ENGAGE_RANGE = 130;
@@ -76,6 +82,8 @@ export class World {
   private dayT = 0;
   private nextId = 1;
   private spawnT = 4;
+  private bountyT = 8;
+  private announcedBounties = new Set<number>();
   private mistWarned = false;
   private mistFeedT = 14;
   private mistFeedIdx = 0;
@@ -198,9 +206,10 @@ export class World {
     const region = regionAt(this.player.x);
     const table = CONTACT_TABLES[region];
     let spec = rng.pick(table);
-    // notoriety draws hunters
+    // notoriety draws hunters — and so does carrying contraband (the blockade)
     const notoriety = Math.max(0, -run.rep.crown);
-    if (region !== 'home' && notoriety > 40 && rng.random() < 0.35) {
+    const smuggling = run.contracts.some((c) => c.type === 'smuggle');
+    if (region !== 'home' && (notoriety > 40 || smuggling) && rng.random() < (smuggling ? 0.5 : 0.35)) {
       const hunters = CONTACT_TABLES.reefs.filter((c) => c.kind === 'hunter');
       if (hunters.length) spec = hunters[0];
     }
@@ -213,6 +222,30 @@ export class World {
     const c: Contact = { id: this.nextId++, spec, ship, wpX: x, wpY: y, gone: false };
     this.pickWaypoint(c);
     this.contacts.push(c);
+  }
+
+  /** Put a bounty's named quarry on the water — she hunts you, tagged so the
+   *  fight settles the warrant. Respawns if she despawns while the job stands. */
+  private spawnBounty(run: RunState, b: Contract): void {
+    const rng = this.rng;
+    const a = rng.rnd(TAU);
+    const x = this.player.x + Math.cos(a) * SPAWN_BUBBLE * 0.7;
+    const y = this.player.y + Math.sin(a) * SPAWN_BUBBLE * 0.7;
+    if (Math.abs(x) > WORLD.width / 2 - 300 || Math.abs(y) > WORLD.height / 2 - 300 || x > WORLD.mistX - 300) return;
+    const ship = makeShip(b.bountyCls!, 'e', x, y, rng.rnd(TAU));
+    ship.faction = b.bountyFaction;
+    ship.name = b.bountyName!;
+    const spec: ContactSpec = {
+      kind: 'bounty', label: b.bountyName!, faction: b.bountyFaction, ships: [b.bountyCls!],
+      behavior: 'hunt', loot: 0, desc: 'the wanted ship — ' + b.bountyName, names: [b.bountyName!],
+    };
+    const c: Contact = { id: this.nextId++, spec, ship, wpX: x, wpY: y, gone: false, bountyId: b.id };
+    this.pickWaypoint(c);
+    this.contacts.push(c);
+    if (!this.announcedBounties.has(b.id)) {
+      this.announcedBounties.add(b.id);
+      this.events.feed('A sail flying ' + b.bountyName + '’s colors stands out of the haze. The warrant is in reach.');
+    }
   }
 
   private pickWaypoint(c: Contact): void {
@@ -324,6 +357,7 @@ export class World {
     if (this.dayT > 75) {
       this.dayT = 0;
       this.day++;
+      expireContracts(run, this.day, this.events); // a missed deadline costs standing
     }
 
     // player sailing
@@ -410,6 +444,13 @@ export class World {
       this.spawnT = this.rng.rnd(6, 14);
       this.spawnContact(run);
     }
+    // a wanted ship sails the chart while her warrant stands
+    this.bountyT -= dt;
+    const bounty = activeBounty(run);
+    if (bounty && this.bountyT <= 0 && !this.inMist() && !this.contacts.some((c) => !c.gone && c.bountyId === bounty.id)) {
+      this.bountyT = 12;
+      this.spawnBounty(run, bounty);
+    }
     for (const c of this.contacts) {
       if (c.gone) continue;
       this.steerContact(c, dt);
@@ -464,6 +505,7 @@ export class World {
           names: c.spec.names,
           x: p.x,
           y: p.y,
+          bountyId: c.bountyId,
         };
         c.gone = true;
         break;
@@ -507,6 +549,7 @@ export class World {
 
   /** Rep + loot bookkeeping after a battle the player won. */
   applyVictory(run: RunState, enc: EncounterSpec): void {
+    if (enc.bountyId !== undefined) completeBounty(run, enc.bountyId, this.events);
     if (enc.loot > 0) {
       run.stores += enc.loot;
       this.events.feed('Her papers, strongbox and dignity are yours: +' + enc.loot + ' stores.');

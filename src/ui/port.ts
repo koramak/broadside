@@ -5,6 +5,7 @@ import { CLASSES } from '../sim/constants';
 import { GOODS, cargoLoad, fleetCargoCap, priceAt } from '../sim/economy';
 import * as runOps from '../sim/run';
 import type { RunState } from '../sim/types';
+import { MAX_ACTIVE, acceptContract, daysLeft } from '../sim/contracts';
 import { FACTIONS, PORTS } from '../sim/worldgen';
 import type { PortDef } from '../sim/worldgen';
 import { audio } from '../audio';
@@ -14,6 +15,8 @@ export class PortScreen {
   onLeave: () => void = () => {};
   /** called after anything that changes the flagship so the map mirror updates */
   onShipChanged: () => void = () => {};
+  /** route a feed line (contract signed) to the HUD + chronicle (wired in main) */
+  onFeed: (msg: string) => void = () => {};
 
   private port: PortDef | null = null;
 
@@ -133,6 +136,50 @@ export class PortScreen {
           run.rumors.map((r) => '«' + r.text + '»').join('<br>') +
           '</div>'
         : '');
+
+    // the job board — faction work that turns the whole map into content
+    const bd = $('pboard');
+    bd.innerHTML = '<h3>THE JOB BOARD</h3>';
+    if (run.contracts.length) {
+      const act = document.createElement('div');
+      act.className = 'd';
+      act.innerHTML =
+        '<span style="color:var(--gold)">SIGNED ARTICLES (' + run.contracts.length + '/' + MAX_ACTIVE + ')</span><br>' +
+        run.contracts
+          .map((c) => {
+            const d = daysLeft(c, day);
+            const warn = d <= 2 ? ' style="color:var(--rust)"' : '';
+            return '• ' + c.title + ' — <span' + warn + '>' + d + 'd left</span>';
+          })
+          .join('<br>');
+      bd.appendChild(act);
+    }
+    if (!run.jobBoard.length) {
+      const e = document.createElement('div');
+      e.className = 'd';
+      e.textContent = 'No work worth a captain’s name pinned here today.';
+      bd.appendChild(e);
+    } else {
+      const full = run.contracts.length >= MAX_ACTIVE;
+      run.jobBoard.forEach((c) => {
+        const row = document.createElement('div');
+        row.className = 'd';
+        row.style.marginTop = '8px';
+        row.innerHTML = '<b style="color:var(--parch)">' + c.title + '</b> · ' + daysLeft(c, day) + ' days<br>' + c.desc;
+        bd.appendChild(row);
+        const btn = document.createElement('button');
+        btn.textContent = full ? 'SIGN — your articles are full (' + MAX_ACTIVE + ')' : 'SIGN THESE ARTICLES';
+        btn.disabled = full;
+        btn.addEventListener('click', () => {
+          audio();
+          if (acceptContract(run, c)) {
+            this.onFeed('Articles signed — ' + c.title.toLowerCase() + '. The clock is running.');
+          }
+          this.render(run, day);
+        });
+        bd.appendChild(btn);
+      });
+    }
   }
 
   bind(): void {

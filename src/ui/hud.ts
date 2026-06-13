@@ -15,6 +15,7 @@ import { LINE_NAMES, station as boardStation } from '../sim/boarding';
 import type { BoardingState, Station, StationId } from '../sim/boarding';
 import { BOARD_CFG } from '../sim/boardingConfig';
 import { currentObjective } from '../sim/objectives';
+import { daysLeft } from '../sim/contracts';
 import { audio } from '../audio';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -475,6 +476,10 @@ export class Hud {
       (GOODS.filter((g) => (run.cargo[g.key] || 0) > 0)
         .map((g) => g.name + ' × ' + run.cargo[g.key])
         .join(' · ') || '') +
+      (run.contracts.length
+        ? '<br><span class="rumorhead">SIGNED ARTICLES</span><br>' +
+          run.contracts.map((c) => '• ' + c.title + ' (' + daysLeft(c, world.day) + 'd)').join('<br>')
+        : '') +
       (run.rumors.length
         ? '<br><span class="rumorhead">HEARD IN THE TAVERNS</span><br>' +
           run.rumors.map((r) => '«' + r.text + '»').join('<br>')
@@ -493,4 +498,5 @@ interface WorldLike {
   player: { sailIdx: number; speed: number };
   wind: { dir: number };
   canDock: { name: string } | null;
+  day: number;
 }

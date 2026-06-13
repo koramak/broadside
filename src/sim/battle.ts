@@ -147,7 +147,9 @@ export class Battle {
       e.captain = cap;
       e.doctrine = cap[1];
       e.faction = spec.faction;
-      e.name = (spec.plate && i === 0) ? 'THE PLATE SHIP' : CLASSES[ecls].name + ' ' + shipName();
+      const baseName = (spec.plate && i === 0) ? 'THE PLATE SHIP' : CLASSES[ecls].name + ' ' + shipName();
+      // a named quarry (bounty) or Mist ship carries her own name
+      e.name = spec.names?.[i] ?? baseName;
       if (spec.ghost) {
         e.ghost = true;
         e.doctrine = 'corsair';

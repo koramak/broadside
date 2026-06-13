@@ -1,6 +1,7 @@
 import type { Captain, DoctrineKey, RefitKey, ShipClass } from './constants';
 import type { GoodKey } from './economy';
 import type { FactionKey } from './worldgen';
+import type { Contract } from './contracts';
 
 export type Team = 'p' | 'e';
 
@@ -135,4 +136,10 @@ export interface RunState {
   stats: { prizes: number; sunk: number };
   cargo: Record<GoodKey, number>;
   rep: Record<FactionKey, number>;
+  /** contracts you've taken on — escort/deliver/smuggle/hunt, with deadlines */
+  contracts: Contract[];
+  /** work posted at the port you're docked in (regenerated each visit) */
+  jobBoard: Contract[];
+  /** monotonic id source for contracts (ties a bounty to its quarry) */
+  nextContractId: number;
 }
