@@ -104,8 +104,24 @@ button:disabled{opacity:.35;cursor:default}
 .rumorhead{color:var(--gold);letter-spacing:.1em;font-size:13px}
 #rep{top:230px;left:12px;display:none;z-index:5;min-width:260px}
 #rep .sub{line-height:1.6}
-#minimap{bottom:14px;right:12px;display:none;z-index:5}
-#minimap canvas{display:block;margin-top:5px;background:rgba(11,27,34,.5);border:1px solid rgba(233,220,190,.14);border-radius:4px}
+#minimap{bottom:14px;right:12px;display:none;z-index:5;cursor:pointer}
+#minimap canvas{display:block;margin-top:5px;background:rgba(11,27,34,.5);border:1px solid rgba(233,220,190,.14);border-radius:4px;pointer-events:none}
+#logbtn{position:fixed;bottom:14px;right:248px;display:none;z-index:5;font-family:'Courier New',monospace;font-size:15px;letter-spacing:.08em;padding:10px 14px;color:var(--gold);border-color:rgba(217,164,65,.5)}
+/* ===== the Captain's Log ===== */
+#log,#bigmap{position:fixed;inset:0;background:rgba(7,16,20,.95);display:none;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;padding:28px 18px;z-index:24;overflow-y:auto}
+#log h1,#bigmap h1{font-size:34px;font-weight:normal;letter-spacing:.14em;color:var(--gold)}
+#logcols{display:flex;gap:16px;width:100%;max-width:1100px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+.logcol{flex:1;min-width:280px;background:rgba(11,27,34,.7);border:1px solid rgba(233,220,190,.2);border-radius:10px;padding:12px 14px}
+.logcol h3{font-size:16px;font-weight:normal;letter-spacing:.12em;color:var(--parch-dim);margin-bottom:8px;border-bottom:1px solid rgba(233,220,190,.14);padding-bottom:6px}
+.logbody{font-family:'Courier New',monospace;font-size:15px;line-height:1.55;max-height:52vh;overflow-y:auto}
+.logrow{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid rgba(233,220,190,.07)}
+.logrow .rtext{flex:1;color:var(--parch)}
+.logrow .rx{cursor:pointer;color:var(--rust);border:1px solid rgba(196,88,58,.5);border-radius:4px;padding:0 7px;font-size:14px;flex-shrink:0}
+.logrow .rx:hover{background:rgba(196,88,58,.2)}
+.logdisc{color:var(--gold);padding:5px 0;border-bottom:1px solid rgba(233,220,190,.07)}
+.logchron{color:var(--parch-dim);padding:3px 0}
+.logempty{color:var(--parch-dim);font-style:italic;opacity:.7}
+#bigmapc{background:rgba(11,27,34,.6);border:1px solid rgba(233,220,190,.18);border-radius:8px;max-width:96vw}
 #port{position:fixed;inset:0;background:rgba(7,16,20,.93);display:none;align-items:center;justify-content:flex-start;flex-direction:column;gap:13px;text-align:center;padding:30px 16px;z-index:20;overflow-y:auto}
 #port h1{font-size:42px;font-weight:normal;letter-spacing:.12em}
 #pmeta{font-family:'Courier New',monospace;font-size:18px;color:var(--parch-dim)}

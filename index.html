@@ -91,9 +91,10 @@
   <div id="replist" class="sub">—</div>
 </div>
 <div class="panel" id="minimap">
-  <div class="lbl">The Chart</div>
+  <div class="lbl">The Chart — click to open</div>
   <canvas id="mmc"></canvas>
 </div>
+<button class="panel" id="logbtn">✒ LOG (L)</button>
 
 <div id="pausemenu">
   <h1>PAUSED</h1>
@@ -160,6 +161,22 @@
   <p id="otext">—</p>
   <div id="runstats"></div>
   <button id="orestart">NEW RUN</button>
+</div>
+
+<div id="log">
+  <h1>THE CAPTAIN'S LOG</h1>
+  <div id="logcols">
+    <div class="logcol"><h3>INTELLIGENCE</h3><div id="logrumors" class="logbody"></div></div>
+    <div class="logcol"><h3>DISCOVERIES</h3><div id="logdisc" class="logbody"></div></div>
+    <div class="logcol"><h3>THE CHRONICLE</h3><div id="logchron" class="logbody"></div></div>
+  </div>
+  <button class="big" id="logclose">CLOSE (L)</button>
+</div>
+
+<div id="bigmap">
+  <h1>THE CHART</h1>
+  <canvas id="bigmapc"></canvas>
+  <button class="big" id="bigmapclose">CLOSE (M)</button>
 </div>
 
 <script type="module" src="/src/main.ts"></script>

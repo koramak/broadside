@@ -64,7 +64,10 @@ export function refreshRumors(
   herePortId: string,
   day: number,
 ): void {
-  run.rumors = run.rumors.filter((r) => day - r.day < 12 && r.portId !== herePortId);
+  // log tips persist until used; tavern tips age out and clear at the port you're in
+  run.rumors = run.rumors.filter(
+    (r) => r.source === 'log' || (day - r.day < 12 && r.portId !== herePortId),
+  );
   // best spreads vs base, excluding the port you're standing in
   const tips: { score: number; good: GoodDef; port: PortLike; price: number }[] = [];
   ports.forEach((p, idx) => {
@@ -76,8 +79,9 @@ export function refreshRumors(
     }
   });
   tips.sort((a, b) => b.score - a.score);
+  const tavernCount = () => run.rumors.filter((r) => r.source !== 'log').length;
   for (const t of tips) {
-    if (run.rumors.length >= 3) break;
+    if (tavernCount() >= 3) break;
     if (run.rumors.some((r) => r.good === t.good.key && r.portId === t.port.id)) continue;
     const shape = RUMOR_SHAPES[(t.good.base + t.port.name.length + day) % RUMOR_SHAPES.length];
     run.rumors.push({
@@ -85,6 +89,7 @@ export function refreshRumors(
       good: t.good.key,
       portId: t.port.id,
       day,
+      source: 'tavern',
     });
   }
 }

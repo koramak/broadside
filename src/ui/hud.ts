@@ -376,6 +376,47 @@ export class Hud {
     return boardStation(board, id)?.phase ?? 'idle';
   }
 
+  /* ============ the Captain's Log ============ */
+
+  onDismissRumor: (i: number) => void = () => {};
+
+  syncLog(run: RunState): void {
+    const rumors = $('logrumors');
+    rumors.innerHTML = '';
+    if (!run.rumors.length) {
+      rumors.innerHTML = '<div class="logempty">No word worth keeping yet. Drink and listen.</div>';
+    } else {
+      run.rumors.forEach((r, i) => {
+        const row = document.createElement('div');
+        row.className = 'logrow';
+        const t = document.createElement('div');
+        t.className = 'rtext';
+        t.textContent = (r.source === 'log' ? '⚓ ' : '» ') + r.text;
+        const x = document.createElement('div');
+        x.className = 'rx';
+        x.textContent = '✕';
+        x.title = 'cross it off';
+        x.addEventListener('click', () => {
+          audio();
+          this.onDismissRumor(i);
+        });
+        row.appendChild(t);
+        row.appendChild(x);
+        rumors.appendChild(row);
+      });
+    }
+
+    const disc = $('logdisc');
+    disc.innerHTML = run.discoveries.length
+      ? run.discoveries.map((d) => '<div class="logdisc">' + d + '</div>').join('')
+      : '<div class="logempty">Nothing charted from a dead man’s papers — yet.</div>';
+
+    const chron = $('logchron');
+    chron.innerHTML = run.chronicle.length
+      ? run.chronicle.slice().reverse().map((c) => '<div class="logchron">' + c + '</div>').join('')
+      : '<div class="logempty">The voyage has barely begun.</div>';
+  }
+
   /* ============ map mode ============ */
 
   setMode(mode: 'battle' | 'map'): void {
@@ -387,11 +428,12 @@ export class Hud {
     $('cargo').style.display = battle ? 'none' : 'block';
     $('rep').style.display = battle ? 'none' : 'block';
     $('minimap').style.display = battle ? 'none' : 'block';
+    $('logbtn').style.display = battle ? 'none' : 'block';
     if (!battle) $('boardbtn').style.display = 'none';
     if (battle) $('dockbtn').style.display = 'none';
     $('hint').textContent = battle
-      ? 'A/D steer · W/S sails · 1-3 shot · Q/E fire · F signal · G order · Tab take helm · B board · Esc menu'
-      : 'A/D steer · W/S sails · B make port · sail the gold mark to advance · Esc menu';
+      ? 'A/D steer · W/S sails · 1-3 shot · Q/E fire · F signal · G order · Tab take helm · B board · L log · Esc menu'
+      : 'A/D steer · W/S sails · B make port · M chart · L log · sail the gold mark · Esc menu';
   }
 
   syncMap(world: WorldLike, run: RunState): void {

@@ -19,7 +19,7 @@ import * as boarding from './boarding';
 import { BOARD_CFG } from './boardingConfig';
 import type { BoardingState } from './boarding';
 import type { RunState } from './types';
-import { applyKillRep, flagStats, topUpCrew } from './run';
+import { applyKillRep, flagStats, rollPrizeLog, topUpCrew } from './run';
 import { GOODS, cargoLoad, fleetCargoCap } from './economy';
 import { EASY } from './easing';
 
@@ -680,6 +680,7 @@ export class Battle {
         pressed += Math.round(s.crew * (EASY.on ? EASY.pressedFrac : 0.25));
         run.stats.prizes++;
         if (s.faction) applyKillRep(run, s.faction, 'take');
+        rollPrizeLog(run, this.rng, this.events, 'full');
       } else {
         // sunk: a thinner purse, but the chop gives up cargo and a few souls
         const coin = Math.round(this.rng.rnd(5, 10));
@@ -692,6 +693,7 @@ export class Battle {
         if (units > 0) run.cargo[g.key] = (run.cargo[g.key] || 0) + units;
         run.stats.sunk++;
         if (s.faction) applyKillRep(run, s.faction, 'sink');
+        rollPrizeLog(run, this.rng, this.events, 'fragment');
         this.events.feed(
           s.name + ' goes under — ' +
           (units > 0 ? units + ' ' + g.name.toLowerCase() + ' bobbing free, ' : '') +

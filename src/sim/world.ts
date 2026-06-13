@@ -100,6 +100,29 @@ export class World {
     for (let i = 0; i < 10; i++) this.spawnCrate();
   }
 
+  /** Turn log-marked shipwreck sites into floating-crate clusters on the map.
+   *  Idempotent: drains run.shipwrecks as it spawns. */
+  materializeShipwrecks(run: RunState): void {
+    if (!run.shipwrecks.length) return;
+    const goods: Crate['kind'][] = ['rum', 'silk', 'spice', 'sugar', 'powder', 'timber'];
+    for (const w of run.shipwrecks) {
+      const n = 3 + this.rng.int(3);
+      for (let i = 0; i < n; i++) {
+        const a = this.rng.rnd(0, TAU);
+        const r = this.rng.rnd(20, 110);
+        this.crates.push({
+          id: this.nextId++,
+          x: w.x + Math.cos(a) * r,
+          y: w.y + Math.sin(a) * r,
+          kind: i === 0 ? 'stores' : this.rng.pick(goods),
+          amount: Math.round(this.rng.rnd(4, 12)),
+          taken: false,
+        });
+      }
+    }
+    run.shipwrecks = [];
+  }
+
   /** Rebuild chart escorts when the armada roster changes. */
   private syncConsorts(run: RunState): void {
     const want = run.armada;
@@ -400,9 +423,10 @@ export class World {
     }
     if (this.crates.filter((c) => !c.taken).length < 6 && this.rng.random() < dt * 0.05) this.spawnCrate();
 
-    // docking prompt
+    // docking prompt — secret coves only once a captured log has revealed them
     this.canDock = null;
     for (const port of PORTS) {
+      if (port.secret && !run.revealedSecrets.includes(port.id)) continue;
       if (Math.hypot(port.x - p.x, port.y - p.y) < DOCK_RANGE) {
         if (run.rep[port.faction] <= -50) {
           if (!this.blockedPortWarned.has(port.id)) {

@@ -4,8 +4,11 @@
 import { CAPTAINS, CLASSES, CREW_COST, PRIZE_VALUE, STRIP_LOOT } from './constants';
 import type { ClassDef, ShipClass } from './constants';
 import type { FactionKey } from './worldgen';
+import { ISLANDS, WORLD, knownPorts, unrevealedSecrets } from './worldgen';
+import { GOODS } from './economy';
 import { clamp } from './math';
 import { Rng } from './rng';
+import type { EventQueue } from './events';
 import type { RunState } from './types';
 import { EASY } from './easing';
 
@@ -14,6 +17,10 @@ export function newRun(): RunState {
     battle: 1,
     objIdx: 0,
     rumors: [],
+    chronicle: [],
+    discoveries: [],
+    revealedSecrets: [],
+    shipwrecks: [],
     gear: { swivels: false, pumps: false },
     stores: EASY.on ? EASY.startingStores : 20,
     pool: 0,
@@ -41,6 +48,78 @@ export function flagStats(run: RunState): ClassDef {
     len: c.len,
     beam: c.beam,
   };
+}
+
+/* ============ the Captain's Log: chronicle + captured intel ============ */
+
+const CHRON_CAP = 150;
+const DISC_CAP = 30;
+
+/** Append a line to the run's persistent chronicle (newest last). */
+export function chronicle(run: RunState, text: string): void {
+  run.chronicle.push(text);
+  if (run.chronicle.length > CHRON_CAP) run.chronicle.shift();
+}
+
+function discovery(run: RunState, text: string): void {
+  run.discoveries.unshift(text);
+  if (run.discoveries.length > DISC_CAP) run.discoveries.pop();
+}
+
+function addPriceTip(run: RunState, rng: Rng, events: EventQueue, smudged: boolean): void {
+  const ports = knownPorts(run.revealedSecrets);
+  const g = GOODS[rng.int(GOODS.length)];
+  let best = ports[0];
+  for (const p of ports) if (p.bias[g.key] > best.bias[g.key]) best = p;
+  const price = Math.round(g.base * best.bias[g.key]);
+  const text =
+    (smudged ? '(water-stained) ' : '') + best.name + ' pays about ' + price + ' for ' + g.name.toLowerCase();
+  run.rumors = run.rumors.filter((r) => !(r.good === g.key && r.portId === best.id));
+  run.rumors.push({ text, good: g.key, portId: best.id, day: run.battle, source: 'log' });
+  events.feed('Her log: ' + text);
+}
+
+function markShipwreck(run: RunState, rng: Rng, events: EventQueue): void {
+  const cand = ISLANDS.filter((i) => i.x < WORLD.mistX - 300);
+  const isl = cand[rng.int(cand.length)];
+  const a = rng.rnd(0, Math.PI * 2);
+  const d = isl.r + rng.rnd(180, 380);
+  run.shipwrecks.push({ x: isl.x + Math.cos(a) * d, y: isl.y + Math.sin(a) * d });
+  const line = 'Her log marks a wreck off the reefs — cargo still bobbing free.';
+  events.feed(line);
+  discovery(run, '⚓ ' + line + ' A salvage site is on your chart.');
+}
+
+function revealSecret(run: RunState, rng: Rng, events: EventQueue): boolean {
+  const hidden = unrevealedSecrets(run.revealedSecrets);
+  if (!hidden.length) return false;
+  const p = hidden[rng.int(hidden.length)];
+  run.revealedSecrets.push(p.id);
+  const line = p.name + ' — a port on no honest chart. Now it is on yours.';
+  events.feed('A secret in the margins: ' + line);
+  discovery(run, '★ ' + line);
+  return true;
+}
+
+/**
+ * Read a captured ship's log. 'full' (a taken prize) rolls richer than
+ * 'fragment' (fished from a wreck): a price tip, sometimes a marked shipwreck,
+ * rarely a secret settlement. One more reason taking beats sinking.
+ */
+export function rollPrizeLog(
+  run: RunState,
+  rng: Rng,
+  events: EventQueue,
+  quality: 'full' | 'fragment' = 'full',
+): void {
+  const roll = rng.random();
+  if (quality === 'fragment') {
+    if (roll < 0.4) addPriceTip(run, rng, events, true);
+    return;
+  }
+  if (roll < 0.55) addPriceTip(run, rng, events, false);
+  else if (roll < 0.85) markShipwreck(run, rng, events);
+  else if (!revealSecret(run, rng, events)) addPriceTip(run, rng, events, false);
 }
 
 /* ============ reputation: how the sea remembers your violence ============ */

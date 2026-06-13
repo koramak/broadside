@@ -35,6 +35,8 @@ export interface PortDef {
   islandIdx: number;
   bias: Record<GoodKey, number>;
   tavern: string[];
+  /** hidden until a captured ship's log reveals it */
+  secret?: boolean;
 }
 
 export interface StoryAction {
@@ -69,6 +71,9 @@ export const ISLANDS: Island[] = [
   { x: 4600, y: -3000, r: 260 }, // 12
   { x: 5400, y: 700, r: 200 }, // 13
   { x: 2600, y: -1900, r: 180 }, // 14
+  // secret coves — only drawn once a captured log reveals them
+  { x: -2050, y: 3650, r: 190, palms: true }, // 15 Graves' Ait
+  { x: 5650, y: 2700, r: 170 }, // 16 Port Nones (Mist-edge)
 ];
 
 export const PORTS: PortDef[] = [
@@ -126,7 +131,36 @@ export const PORTS: PortDef[] = [
       'A woman drank here who claimed she sailed INTO the Mist. She paid with dry coins.',
     ],
   },
+  {
+    id: 'graves', name: "Graves' Ait", faction: 'brethren', secret: true, x: -2050, y: 4040, islandIdx: 15,
+    bias: { sugar: 1.6, rum: 0.5, powder: 1.5, timber: 1.3, silk: 1.7, spice: 1.6 },
+    tavern: [
+      'Not on any chart drawn by a living hand. That is the entire business model.',
+      'Pay in coin or in silence. Silence is dearer and they prefer it.',
+      'Everything sells high here because everything here is already stolen twice.',
+    ],
+  },
+  {
+    id: 'nones', name: 'Port Nones', faction: 'brethren', secret: true, x: 5650, y: 3060, islandIdx: 16,
+    bias: { sugar: 0.4, rum: 0.4, powder: 0.5, timber: 0.5, silk: 2.0, spice: 2.0 },
+    tavern: [
+      'The harbour master has been dead since the last war and still keeps excellent books.',
+      'Prices are wonderful. Do not ask what the buyers do with what they buy.',
+      'You will leave before the bell that has no clapper rings. Everyone does. Most of them.',
+    ],
+  },
 ];
+
+/** Ports the player can see/use: all the open ones, plus any secret cove a
+ *  captured log has revealed. `revealed` is run.revealedSecrets. */
+export function knownPorts(revealed: readonly string[]): PortDef[] {
+  return PORTS.filter((p) => !p.secret || revealed.includes(p.id));
+}
+
+/** The hidden coves not yet revealed (a log can surface one of these). */
+export function unrevealedSecrets(revealed: readonly string[]): PortDef[] {
+  return PORTS.filter((p) => p.secret && !revealed.includes(p.id));
+}
 
 export const STORY_ACTIONS: StoryAction[] = [
   { n: 1, x: -3600, y: -500 },

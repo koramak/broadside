@@ -6,7 +6,7 @@ import './ui/ui.css';
 import { Battle } from './sim/battle';
 import type { BattleSpec } from './sim/battle';
 import { SIM_DT } from './sim/constants';
-import { newRun, topUpCrew } from './sim/run';
+import { newRun, topUpCrew, chronicle } from './sim/run';
 import { clampCargo } from './sim/economy';
 import { Rng } from './sim/rng';
 import type { RunState } from './sim/types';
@@ -21,7 +21,7 @@ import { Hud, $ } from './ui/hud';
 import { HarborScreen } from './ui/harbor';
 import { PortScreen } from './ui/port';
 import { Input } from './input/input';
-import { Minimap } from './ui/minimap';
+import { Minimap, BigMap } from './ui/minimap';
 import { audio, boom, setMusic, boardTick, boardFoul } from './audio';
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 import { refreshRumors } from './sim/economy';
@@ -36,6 +36,7 @@ const portScreen = new PortScreen();
 const lib = new ModelLibrary();
 let worldView: WorldView | null = null;
 let minimap: Minimap | null = null;
+let bigmap: BigMap | null = null;
 
 type Mode = 'map' | 'battle' | 'aftermath' | 'port' | 'over';
 
@@ -47,7 +48,22 @@ let battle: Battle | null = null;
 let currentEnc: EncounterSpec | null = null;
 let shipViews: ShipView[] = [];
 let paused = false;
+let logOpen = false;
 let mode: Mode = 'map';
+
+function toggleLog(v?: boolean): void {
+  logOpen = v === undefined ? !logOpen : v;
+  if (logOpen) hud.syncLog(run);
+  $('log').style.display = logOpen ? 'flex' : 'none';
+}
+
+let mapOpen = false;
+function toggleMap(v?: boolean): void {
+  // the big chart only makes sense on the sea map
+  if (mode !== 'map' && v !== false) return;
+  mapOpen = v === undefined ? !mapOpen : v;
+  $('bigmap').style.display = mapOpen ? 'flex' : 'none';
+}
 
 function setPaused(v: boolean): void {
   if (v && battle && battle.phase === 'end') return;
@@ -197,6 +213,33 @@ const input = new Input({
   togglePause: () => {
     if (mode === 'battle' || mode === 'map') setPaused(!paused);
   },
+  toggleLog: () => {
+    if (!paused) toggleLog();
+  },
+  toggleMap: () => {
+    if (!paused) toggleMap();
+  },
+});
+
+hud.onDismissRumor = (i) => {
+  run.rumors.splice(i, 1);
+  hud.syncLog(run);
+};
+$('logbtn').addEventListener('click', () => {
+  audio();
+  if (!paused) toggleLog();
+});
+$('logclose').addEventListener('click', () => {
+  audio();
+  toggleLog(false);
+});
+$('minimap').addEventListener('click', () => {
+  audio();
+  if (!paused) toggleMap(true);
+});
+$('bigmapclose').addEventListener('click', () => {
+  audio();
+  toggleMap(false);
 });
 
 hud.onTakeHelm = (idx) => {
@@ -332,7 +375,7 @@ function frame(now: number): void {
   last = now;
   frameCount++;
 
-  if (!paused && !freeze) {
+  if (!paused && !freeze && !logOpen && !mapOpen) {
     acc += dtReal;
     while (acc >= SIM_DT) {
       acc -= SIM_DT;
@@ -372,6 +415,7 @@ function frame(now: number): void {
       switch (e.kind) {
         case 'feed':
           hud.feed(e.msg);
+          chronicle(run, e.msg); // persist into the Captain's Log
           break;
         case 'boom':
           boom(e.vol, e.len, e.freq);
@@ -436,6 +480,7 @@ function frame(now: number): void {
     worldView?.update(world, run, simTime);
     effects.update(paused || mode !== 'map' ? 0 : dtReal);
     if (mode === 'map') {
+      world.materializeShipwrecks(run); // log-marked wrecks become floating crates
       hud.syncMap(world, run);
       const targets: { x: number; y: number; color: string }[] = [];
       const obj = currentObjective(run);
@@ -445,6 +490,7 @@ function frame(now: number): void {
       }
       hud.syncOffscreen(shell.camera, targets);
       minimap?.sync(world, run, simTime);
+      if (mapOpen) bigmap?.draw(world, run, simTime);
       if (!paused) hud.updateFeed(dtReal);
     }
   }
@@ -457,6 +503,7 @@ function frame(now: number): void {
   await lib.preload([...SHIP_MODEL_NAMES, ...PROP_MODEL_NAMES]);
   worldView = new WorldView(shell.scene, lib);
   minimap = new Minimap();
+  bigmap = new BigMap();
   startRun();
   requestAnimationFrame(frame);
 })().catch((err) => {

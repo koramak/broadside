@@ -16,6 +16,8 @@ export interface InputActions {
   boardStation(n: number): void;
   nextHelm(): void;
   togglePause(): void;
+  toggleLog(): void;
+  toggleMap(): void;
 }
 
 export class Input {
@@ -54,6 +56,8 @@ export class Input {
       if (k === 'f') actions.signal();
       if (k === 'g') actions.toggleOrder();
       if (k === 'b') actions.board();
+      if (k === 'l') actions.toggleLog();
+      if (k === 'm') actions.toggleMap();
     });
     addEventListener('keyup', (e) => {
       this.keys[e.key.toLowerCase()] = false;

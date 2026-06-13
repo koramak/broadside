@@ -97,8 +97,10 @@ export interface Rumor {
   text: string;
   good: string;
   portId: string;
-  /** run-day the rumor was heard; goes stale after ~12 days */
+  /** run-day the rumor was heard; tavern tips go stale after ~12 days */
   day: number;
+  /** 'tavern' tips expire/refresh on docking; 'log' tips persist until used */
+  source?: 'tavern' | 'log';
 }
 
 export interface RunState {
@@ -107,6 +109,14 @@ export interface RunState {
   objIdx: number;
   /** tavern intelligence — real price spreads, irreverently worded */
   rumors: Rumor[];
+  /** persistent feed history for the Captain's Log (newest pushed last, capped) */
+  chronicle: string[];
+  /** notable intel pulled from captured logs (charted ports, marked wrecks) */
+  discoveries: string[];
+  /** ids of secret settlements a captured log has revealed */
+  revealedSecrets: string[];
+  /** floating-salvage sites marked by captured logs, waiting to materialize */
+  shipwrecks: { x: number; y: number }[];
   /** chandler gear: bolt-on historical upgrades */
   gear: { swivels: boolean; pumps: boolean };
   stores: number;

@@ -4,17 +4,41 @@
 import * as THREE from 'three';
 import type { World } from '../sim/world';
 import { ISLANDS, PORTS, WORLD } from '../sim/worldgen';
+import type { PortDef } from '../sim/worldgen';
 import { currentObjective, objectivePos } from '../sim/objectives';
 import type { RunState } from '../sim/types';
 import { ShipView } from './shipView';
 import { ModelLibrary } from './models';
 import { TAU } from '../sim/math';
 
+/** A floating parchment nameplate for a port (canvas-textured sprite). */
+function makePortLabel(name: string, secret: boolean): THREE.Sprite {
+  const cv = document.createElement('canvas');
+  cv.width = 512;
+  cv.height = 128;
+  const g = cv.getContext('2d')!;
+  g.fillStyle = 'rgba(11,27,34,0.8)';
+  g.strokeStyle = secret ? 'rgba(196,88,58,0.9)' : 'rgba(233,220,190,0.5)';
+  g.lineWidth = 4;
+  g.beginPath();
+  g.roundRect(10, 28, 492, 72, 12);
+  g.fill();
+  g.stroke();
+  g.fillStyle = secret ? '#c4583a' : '#e9dcbe';
+  g.font = '600 40px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText((secret ? '☠ ' : '') + name, 256, 66);
+  const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, depthTest: false });
+  return new THREE.Sprite(mat);
+}
+
 export class WorldView {
   group = new THREE.Group();
   private contactViews = new Map<number, ShipView>();
   private consortViews: ShipView[] = [];
   private crateMeshes = new Map<number, THREE.Group>();
+  private portViews: { port: PortDef; group: THREE.Group; label: THREE.Sprite }[] = [];
   private marker: THREE.Group;
   private markerRing: THREE.Mesh;
   private markerLabel: THREE.Sprite;
@@ -59,18 +83,26 @@ export class WorldView {
       }
     });
 
-    // ports: dock + tower + a crate or two
+    // ports: dock + tower + crate + a floating nameplate (shown on approach)
     for (const port of PORTS) {
+      const pg = new THREE.Group();
       const dock = lib.instantiateProp('structure-platform-dock', 30);
       dock.position.set(port.x, 4, port.y);
       dock.rotation.y = Math.atan2(port.y - ISLANDS[port.islandIdx].y, port.x - ISLANDS[port.islandIdx].x);
-      this.group.add(dock);
+      pg.add(dock);
       const tower = lib.instantiateProp('tower-complete-small', 26);
       tower.position.set(port.x * 0.97 + ISLANDS[port.islandIdx].x * 0.03, 10, port.y * 0.97 + ISLANDS[port.islandIdx].y * 0.03);
-      this.group.add(tower);
+      pg.add(tower);
       const crate = lib.instantiateProp('crate', 14);
       crate.position.set(port.x + 40, 6, port.y + 26);
-      this.group.add(crate);
+      pg.add(crate);
+      const label = makePortLabel(port.name, port.secret ?? false);
+      label.position.set(port.x, 130, port.y);
+      label.scale.set(300, 75, 1);
+      label.visible = false;
+      pg.add(label);
+      this.group.add(pg);
+      this.portViews.push({ port, group: pg, label });
     }
 
     // story marker: gold ring + pennant
@@ -148,6 +180,20 @@ export class WorldView {
       (this.markerRing.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.2 * Math.sin(time * 2.4);
     } else {
       this.marker.visible = false;
+    }
+
+    // port nameplates: reveal secrets once charted, fade names in on approach
+    const pp = world.player;
+    for (const pv of this.portViews) {
+      const known = !pv.port.secret || run.revealedSecrets.includes(pv.port.id);
+      pv.group.visible = known;
+      if (!known) continue;
+      const d = Math.hypot(pv.port.x - pp.x, pv.port.y - pp.y);
+      const near = d < 900;
+      pv.label.visible = near;
+      if (near) {
+        (pv.label.material as THREE.SpriteMaterial).opacity = Math.min(1, (900 - d) / 350);
+      }
     }
 
     // the armada on the chart, holding station off your quarters
