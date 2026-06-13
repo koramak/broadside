@@ -1,6 +1,41 @@
 # CLAUDE.md — BROADSIDE (working title)
 
-This file is the project memory. Read it fully before any work. The design doc principles here are LOCKED unless the human explicitly reopens them. The reference prototypes in /reference are the source of truth for game feel and tuning values.
+This file is the project memory: locked design canon + turn-1 orientation. Read it fully before any work. The pillars / art / locked mechanics here are LOCKED unless the human explicitly reopens them. Live design *state* (what's working, what's next, open decisions) lives in **DESIGN.md** — read that too. The reference prototypes in /reference are the source of truth for ported sim feel and tuning.
+
+## Orientation (read first)
+
+One-liner: wind-driven naval-combat + armada-building roguelite in a hand-carved diorama sea; historical pirates early, ghosts/monsters in the Mist late. Web-first (Vite + TS + Three.js).
+
+**LIVE:** https://koramak.github.io/broadside/ (GitHub Pages, repo `koramak/broadside`). Every push to `main` auto-deploys (~50s via Actions).
+
+**Run / build (Node is NOT on PATH):**
+```
+export PATH="$HOME/.local/node-toolchain/node-v22.16.0-darwin-arm64/bin:$PATH"
+npm run dev      # Vite dev server, port 5173
+npm run build    # tsc --noEmit + vite build  (the only "test" — there is no test suite)
+```
+(`.claude/settings.json` sets this PATH for future sessions; `PLAY.command` is a double-click launcher for the non-coder human. `gh` CLI lives at `~/.local/gh-cli/gh_2.94.0_macOS_arm64/bin/gh`, authed with `workflow` scope.)
+
+**Debug handle:** `window.__broadside` exposes `{ run, world, battle, mode, freeze(b), stepMany(n), stepMap(n), startRun(), handleBattleOutcome() }` for headless verification. The preview throttles rAF when hidden — take a screenshot to pump frames. Corsair-doctrine AI beats naive test bots; that's the game's teeth, not a regression.
+
+**File map**
+- `src/main.ts` — entry: fixed-timestep loop, mode machine (`map`/`battle`/`port`/`aftermath`), input wiring, sim-event drain, overlay toggles (Captain's Log `L`, big map `M`).
+- `src/input/input.ts` — keyboard + touch → high-level actions.
+- `src/audio.ts` — procedural synth (cannon/woodHit/splash + per-station boarding ticks) + music player + optional CC0 sample slot (`public/assets/sfx/`).
+- `src/sim/` — **deterministic, ZERO Three.js imports, seeded RNG, fixed 60 Hz.** Portable/testable core.
+  - `constants.ts` locked tuning (classes, ammo, doctrines, ESCALATION, prize values) · `types.ts` RunState/Ship/Rumor · `math.ts` + `rng.ts` (mulberry32) pure helpers
+  - `physics.ts` shared sailing (wind curve, committed turn, rowing floor, pace amp) — used by battle AND map
+  - `battle.ts` arena sim (gunnery, straddle aim, AI doctrines, damage/rake, boarding entry, battleWon, rep + ship's-log calls)
+  - `boarding.ts` tap-timing station deck-fight · `boardingConfig.ts` ALL boarding FEEL dials
+  - `run.ts` meta-layer: flagship persistence, stores, armada (+replaceConsort), prizes, `applyKillRep`, `rollPrizeLog`, `chronicle`, harbor ops, chandler
+  - `economy.ts` goods/pricing/`refreshRumors` · `world.ts` sea-map sim (contacts, crates, docking, encounters, shipwrecks, consort formation)
+  - `worldgen.ts` authored archipelago (islands, 6 ports + 2 secret, factions, story marks, Mist waves, `knownPorts`) · `objectives.ts` guided tutorial chain + tutorial-wind rig
+  - `events.ts` sim→frontend queue · `easing.ts` testing-difficulty switch · `tuning.ts` pause-menu combat dials
+- `src/render/` — reads sim, owns Three.js. `renderer.ts` SceneShell (oblique camera + boarding focus-glide, GPU sea shader, Mist mood) · `shipView.ts` per-ship meshes/damage/rings (×2 visual scale) · `worldView.ts` map scene (islands, ports+nameplates, objective marker, contacts, consorts, crates, Mist wall) · `models.ts` Kenney GLB loader + name mapping · `effects.ts` smoke/impact/splash/wake/ball tracers.
+- `src/ui/` — HTML overlay. `hud.ts` battle+map HUD, boarding station panel, Captain's Log render · `harbor.ts` between-action prize/refit/swap screen · `port.ts` docked screen (market/yard/chandler/tavern) · `minimap.ts` small chart + `BigMap` · `ui.css` parchment/ink/gold/rust.
+- `index.html` — all DOM overlays. `reference/` — original HTML prototypes (slice = sim port source).
+
+**Conventions** — see Working agreements at the bottom. Most important: `sim/` never imports Three; any tuning/input change is a `FEEL:` commit + tell the human; `main` stays playable; no localStorage without an export path.
 
 ## What this game is
 
@@ -74,23 +109,20 @@ exposed in the pause menu as FAIR WINDS & MERCY. While on: player damage ×0.8
 pressed hands 45% + auto-muster after victories, repair +50% for 8, starting
 stores 30, map wind never against the current objective, carpenter trickle-
 repairs hull to 35% at sea. Locked constants in constants.ts are untouched;
-flipping EASY.on off restores prototype-true balance. Sweeps (furled = slow
-rowing, 18u), accel rates 0.7/1.4, and the 2026-06-12 pace amp (all ships:
-speed ×1.15, turn ×1.2 — relative class balance preserved) are PERMANENT feel
-changes, outside the gate. Ship visuals draw at ×2 sim scale (render only).
+flipping EASY.on off restores prototype-true balance. These feel changes are
+PERMANENT and OUTSIDE the gate (in physics.ts, not easing.ts): sweeps — a
+furled ship rows at ROW_EFF 0.075 ≈ 1.5× sailing dead into the wind, scaled by
+crew; accel/decel rates 0.7/1.4; the pace amp (all ships speed ×1.15, turn ×1.2,
+class ratios preserved). Ship visuals draw at ×2 sim scale (render only).
 
-## Current state (2026-06-12, autonomous build session)
+## Current state
 
-Full game playable end to end: 6-action story spine across a hand-authored
-archipelago (sea map, 6 ports, 3 factions with reputation, 6-good trading
-economy, salvage crates, contacts that flee/patrol/hunt), the locked battle sim
-ported deterministically (src/sim/ — zero Three imports, seeded RNG, fixed
-60 Hz), Kenney Pirate Kit diorama render (oblique camera, GPU flat-shaded sea),
-real-time boarding, and the post-Plate-Ship Mist endgame (3 ghost actions
-ending at THE HARROW). Ghost tuning (new system, not locked values): wind-eff
-floor 0.85, half guns, chain ×0.5 / grape ×0.3 vs ghosts, never strike, cannot
-be boarded. GitHub Pages workflow is committed; needs a git remote + push to go
-live. Local toolchain note: Node lives at ~/.local/node-toolchain (not on PATH).
+Live and playable end to end. For the live status of each system, what's in
+progress, open decisions, and the next feature, see **DESIGN.md** (kept current;
+this section intentionally stays short to avoid drift). Ghost/Mist tuning (new
+system, not locked values): wind-eff floor 0.85, half guns, chain ×0.5 / grape
+×0.3 vs ghosts, never strike, cannot be boarded; endgame is 3 ghost actions
+ending at THE HARROW.
 
 ## Working agreements
 
