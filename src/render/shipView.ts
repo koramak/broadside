@@ -137,11 +137,11 @@ export class ShipView {
 
     this.strikeFlag.visible = s.struck && !s.dead;
     if (this.strikeFlag.visible) this.strikeFlag.rotation.y = time * 0.7;
-    // every live ship wears its colors: bright gold = your helm, dim gold =
-    // your consorts, rust = enemy. No more guessing by the cut of her sails.
-    this.selRing.visible = s.sinking === 0 && !s.struck;
-    (this.selRing.material as THREE.MeshBasicMaterial).opacity =
-      controlled ? 0.85 : s.team === 'p' ? 0.4 : 0.55;
+    // rings are for telling OTHER ships apart: dim gold = your consorts, rust =
+    // enemy. The ship you're steering wears none — it's the one under the
+    // camera, you always know which it is.
+    this.selRing.visible = !controlled && s.sinking === 0 && !s.struck;
+    (this.selRing.material as THREE.MeshBasicMaterial).opacity = s.team === 'p' ? 0.4 : 0.55;
   }
 
   dispose(scene: THREE.Scene): void {
