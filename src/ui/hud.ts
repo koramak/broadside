@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Battle } from '../sim/battle';
 import { alive } from '../sim/battle';
 import { DOCTRINES, SAILNAMES } from '../sim/constants';
+import { loyaltyBand, loyaltyWord } from '../sim/captains';
 import { TUNING } from '../sim/tuning';
 import { GOODS, cargoLoad, fleetCargoCap } from '../sim/economy';
 import { FACTIONS } from '../sim/worldgen';
@@ -17,6 +18,11 @@ import { currentObjective } from '../sim/objectives';
 import { audio } from '../audio';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id)!;
+
+/** consort morale → chip colour (mirrors the harbor palette) */
+const HUD_MOOD_COLOR: Record<string, string> = {
+  devoted: 'var(--gold)', steady: 'var(--parch-dim)', wary: '#d8915a', mutinous: 'var(--rust)',
+};
 
 interface FeedItem {
   el: HTMLElement;
@@ -65,11 +71,14 @@ export class Hud {
     f.innerHTML = '';
     battle.ships.forEach((s, i) => {
       if (s.team !== 'p' || i === battle.ctrl) return;
-      const doc = s.doctrine ? DOCTRINES[s.doctrine] : null;
+      const docShort = s.doctrine ? DOCTRINES[s.doctrine].label.split(' · ')[0] : '';
+      const mood = s.loyalty !== undefined
+        ? ` · <span style="color:${HUD_MOOD_COLOR[loyaltyBand(s.loyalty)]}">${loyaltyWord(s.loyalty)}</span>`
+        : '';
       const c = document.createElement('div');
       c.className = 'chip';
       c.innerHTML = `<button data-h="${i}">HELM</button><div class="nm">${s.name}</div>
-        <div class="tr">Capt. ${s.captain ? s.captain[0] : '—'} · ${doc ? doc.label : ''}</div>
+        <div class="tr">Capt. ${s.captain ? s.captain[0] : '—'} · ${docShort}${mood}</div>
         <div class="bar hull"><i></i></div>`;
       f.appendChild(c);
       this.chipEls.set(i, c);

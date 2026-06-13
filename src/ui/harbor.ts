@@ -5,8 +5,17 @@ import { CLASSES, DOCTRINES, STRIP_LOOT, PRIZE_VALUE } from '../sim/constants';
 import * as runOps from '../sim/run';
 import type { RunState } from '../sim/types';
 import { Rng } from '../sim/rng';
+import { LOYALTY, TEMPERAMENT, bark, loyaltyBand, loyaltyWord } from '../sim/captains';
 import { audio } from '../audio';
 import { $ } from './hud';
+
+/** Morale band → a colour for the little loyalty bar. */
+const LOYALTY_COLOR: Record<string, string> = {
+  devoted: 'var(--gold)',
+  steady: 'var(--parch)',
+  wary: '#d8915a',
+  mutinous: 'var(--rust)',
+};
 
 export interface HarborOpts {
   title: string;
@@ -17,6 +26,8 @@ export interface HarborOpts {
 
 export class HarborScreen {
   onSetSail: () => void = () => {};
+  /** route a captain's bark to the feed + chronicle (wired in main) */
+  onFeed: (msg: string) => void = () => {};
   private opts: HarborOpts = { title: 'BETWEEN ACTIONS', nextLabel: 'SET SAIL', atSea: false };
   /** which pending prize's "replace a consort" picker is open (-1 = none) */
   private replacingIdx = -1;
@@ -83,19 +94,49 @@ export class HarborScreen {
     }
     ships$.appendChild(fcard);
 
-    // armada card
-    const acard = document.createElement('div');
-    acard.className = 'hcard';
-    acard.innerHTML =
-      '<h3>YOUR ARMADA (' + run.armada.length + '/2)</h3>' +
-      '<div class="d">' +
-      (run.armada.length
-        ? run.armada
-            .map((a) => CLASSES[a.cls].name + ' ' + a.name.split(' ').slice(-1)[0] + ' — Capt. ' + a.captain[0])
-            .join('<br>')
-        : 'You sail alone.') +
-      '<br><br>Consorts refit between actions for free, but a consort lost is lost.</div>';
-    ships$.appendChild(acard);
+    // armada — one card per consort: she's a person now, with a mood and a price
+    if (!run.armada.length) {
+      const acard = document.createElement('div');
+      acard.className = 'hcard';
+      acard.innerHTML =
+        '<h3>YOUR ARMADA (0/2)</h3><div class="d">You sail alone. Crew a prize to take on a captain — ' +
+        'and a temperament.</div>';
+      ships$.appendChild(acard);
+    } else {
+      run.armada.forEach((a, ai) => {
+        const t = TEMPERAMENT[a.captain[1]];
+        const band = loyaltyBand(a.loyalty);
+        const shortName = a.name.split(' ').slice(-1)[0];
+        const card = document.createElement('div');
+        card.className = 'hcard';
+        card.innerHTML =
+          '<h3>' + CLASSES[a.cls].name.toUpperCase() + ' ' + shortName + ' — Capt. ' + a.captain[0] + '</h3>' +
+          '<div class="d">' + t.title + ' · ' + t.creed + '<br>' +
+          '<span style="color:var(--parch)">Loves</span> ' + t.loves + '<br>' +
+          '<span style="color:var(--parch)">Hates</span> ' + t.hates + '<br>' +
+          '<div class="loybar"><i style="width:' + Math.round(a.loyalty) + '%;background:' +
+          LOYALTY_COLOR[band] + '"></i></div>' +
+          'Morale: <span style="color:' + LOYALTY_COLOR[band] + '">' + loyaltyWord(a.loyalty) + '</span>' +
+          (band === 'mutinous' ? ' — she is one bad day from sailing off' : '') +
+          '</div>';
+        // share the plunder: spend stores to buy back goodwill
+        const carouse = document.createElement('button');
+        carouse.textContent = a.loyalty >= LOYALTY.max
+          ? 'CAROUSE — she could not be happier'
+          : 'CAROUSE — a fair split of the plunder (+morale, ' + LOYALTY.carouseCost + ' stores)';
+        carouse.disabled = a.loyalty >= LOYALTY.max || run.stores < LOYALTY.carouseCost;
+        carouse.addEventListener('click', () => {
+          audio();
+          if (runOps.carouse(run, ai)) {
+            const line = bark(a.captain, 'content', rng);
+            if (line) this.onFeed(line);
+          }
+          this.render(run, rng);
+        });
+        card.appendChild(carouse);
+        ships$.appendChild(card);
+      });
+    }
 
     // prizes
     const pz = $('hprizes');
@@ -120,7 +161,7 @@ export class HarborScreen {
         take.disabled = run.stores < short;
         take.addEventListener('click', () => {
           audio();
-          runOps.crewPrize(run, i, rng);
+          if (runOps.crewPrize(run, i, rng)) this.welcomeAboard(run, rng);
           this.render(run, rng);
         });
         card.appendChild(take);
@@ -147,7 +188,7 @@ export class HarborScreen {
             drop.disabled = run.stores < short;
             drop.addEventListener('click', () => {
               audio();
-              runOps.replaceConsort(run, i, ci, rng);
+              if (runOps.replaceConsort(run, i, ci, rng)) this.welcomeAboard(run, rng);
               this.replacingIdx = -1;
               this.render(run, rng);
             });
@@ -179,6 +220,14 @@ export class HarborScreen {
     });
 
     $('hnext').textContent = this.opts.nextLabel;
+  }
+
+  /** The captain just added to the armada introduces herself, in character. */
+  private welcomeAboard(run: RunState, rng: Rng): void {
+    const a = run.armada[run.armada.length - 1];
+    if (!a) return;
+    const line = bark(a.captain, 'recruit', rng);
+    if (line) this.onFeed(line);
   }
 
   bind(): void {

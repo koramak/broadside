@@ -42,6 +42,10 @@ export interface Ship {
   faction?: FactionKey;
   /** the Drowned ignore the wind you spent a whole run learning */
   ghost?: boolean;
+  /** 0..100 morale for a consort under your flag; seeded from the armada
+   *  entry at battle start, drifts during the fight, written back at its end.
+   *  undefined for the flagship and all enemies. */
+  loyalty?: number;
 }
 
 export interface Ball {
@@ -85,6 +89,9 @@ export interface ArmadaEntry {
   cls: ShipClass;
   name: string;
   captain: Captain;
+  /** 0..100 morale. High → fights harder, obeys instantly. Low → hesitates,
+   *  ignores orders. Rock-bottom → she sails off with the hull. See captains.ts. */
+  loyalty: number;
 }
 
 export interface Prize {

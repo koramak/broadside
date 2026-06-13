@@ -6,7 +6,8 @@ import './ui/ui.css';
 import { Battle } from './sim/battle';
 import type { BattleSpec } from './sim/battle';
 import { SIM_DT } from './sim/constants';
-import { newRun, topUpCrew, chronicle } from './sim/run';
+import { newRun, topUpCrew, chronicle, desertionSweep } from './sim/run';
+import { bark } from './sim/captains';
 import { clampCargo } from './sim/economy';
 import { Rng } from './sim/rng';
 import type { RunState } from './sim/types';
@@ -250,6 +251,10 @@ hud.onBoardTap = (id) => {
 };
 
 harbor.bind();
+harbor.onFeed = (m) => {
+  hud.feed(m);
+  chronicle(run, m);
+};
 harbor.onSetSail = () => {
   if (mode !== 'aftermath') return;
   // aftermath dismissed — back to the chart (or, after the Harrow, the end)
@@ -336,6 +341,12 @@ function handleBattleOutcome(): void {
   if (out.result === 'won') {
     const enc = currentEnc;
     if (world && enc) world.applyVictory(run, enc);
+    // any consort whose morale bottomed out slips away with her hull
+    for (const d of desertionSweep(run)) {
+      const line = bark(d.captain, 'desert', masterRng) ?? d.captain[0] + ' deserts, taking her hull with her.';
+      hud.feed(line);
+      chronicle(run, line);
+    }
     const lost = clampCargo(run);
     if (lost > 0) hud.feed(lost + ' cargo went down with the hull that carried it.');
     endBattleCleanup();

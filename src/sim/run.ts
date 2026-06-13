@@ -9,8 +9,9 @@ import { GOODS } from './economy';
 import { clamp } from './math';
 import { Rng } from './rng';
 import type { EventQueue } from './events';
-import type { RunState } from './types';
+import type { ArmadaEntry, RunState } from './types';
 import { EASY } from './easing';
+import { LOYALTY, clampLoyalty } from './captains';
 
 export function newRun(): RunState {
   return {
@@ -265,7 +266,7 @@ export function crewPrize(run: RunState, i: number, rng: Rng): boolean {
   run.pool = Math.max(0, run.pool - hands);
   run.stores -= buy;
   const cap = CAPTAINS[Math.floor(rng.rnd(CAPTAINS.length))];
-  run.armada.push({ cls: p.cls, name: p.name, captain: cap });
+  run.armada.push({ cls: p.cls, name: p.name, captain: cap, loyalty: LOYALTY.start });
   run.pendingPrizes.splice(i, 1);
   return true;
 }
@@ -282,9 +283,29 @@ export function replaceConsort(run: RunState, prizeIdx: number, consortIdx: numb
   run.pool = Math.max(0, run.pool - prizeHands(p.cls));
   run.stores -= buy;
   const cap = CAPTAINS[Math.floor(rng.rnd(CAPTAINS.length))];
-  run.armada.push({ cls: p.cls, name: p.name, captain: cap });
+  run.armada.push({ cls: p.cls, name: p.name, captain: cap, loyalty: LOYALTY.start });
   run.pendingPrizes.splice(prizeIdx, 1);
   return true;
+}
+
+/* ============ loyalty: keeping (or losing) the crew of captains ============ */
+
+/** Spend stores to win a consort's goodwill back — a night ashore, a fair
+ *  split of the plunder. The harbor lever that closes the loyalty loop. */
+export function carouse(run: RunState, idx: number): boolean {
+  const a = run.armada[idx];
+  if (!a || a.loyalty >= LOYALTY.max || run.stores < LOYALTY.carouseCost) return false;
+  run.stores -= LOYALTY.carouseCost;
+  a.loyalty = clampLoyalty(a.loyalty + LOYALTY.carouseGain);
+  return true;
+}
+
+/** Remove any consort whose morale has hit rock bottom — she sails off with
+ *  her hull (and whatever was in it). Returns who left, for the feed/log. */
+export function desertionSweep(run: RunState): ArmadaEntry[] {
+  const gone = run.armada.filter((a) => a.loyalty <= LOYALTY.desertAt);
+  if (gone.length) run.armada = run.armada.filter((a) => a.loyalty > LOYALTY.desertAt);
+  return gone;
 }
 
 export function stripPrize(run: RunState, i: number): boolean {

@@ -22,6 +22,10 @@ import type { RunState } from './types';
 import { applyKillRep, flagStats, rollPrizeLog, topUpCrew } from './run';
 import { GOODS, cargoLoad, fleetCargoCap } from './economy';
 import { EASY } from './easing';
+import {
+  LOYALTY, bark, clampLoyalty, loyaltyBand, loyaltyEffect, orderReaction, tacticalContent,
+} from './captains';
+import type { BarkKey } from './captains';
 
 export type BattleOutcome =
   | { result: 'won'; salvage: number; pressed: number }
@@ -78,6 +82,8 @@ export class Battle {
 
   private volleyRakeLogged = new Set<number>();
   private volleyCounter = 0;
+  /** seconds since the last consort-contentment sample (loyalty drift) */
+  private loyaltyT = 0;
 
   /** Player steering input, set by the front end each frame. */
   playerRudder = 0;
@@ -124,6 +130,7 @@ export class Battle {
       s.captain = a.captain;
       s.doctrine = a.captain[1];
       s.name = a.name;
+      s.loyalty = a.loyalty; // her morale rides into the fight, drifts, rides back out
       this.ships.push(s);
     });
 
@@ -221,6 +228,8 @@ export class Battle {
     }
     let crewFac = 0.55 + 0.45 * (s.crew / s.maxCrew);
     if (s.gauge) crewFac *= 1.12;
+    // a consort's morale shows in her gun crew's pace (lower reloadMul = faster)
+    if (s.loyalty !== undefined) crewFac /= loyaltyEffect(s.loyalty).reloadMul;
     for (let i = 0; i < 2; i++) s.reload[i] = Math.max(0, s.reload[i] - dt * crewFac);
     s.wakeT -= dt;
     if (s.speed > 15 && s.wakeT <= 0) {
@@ -362,7 +371,9 @@ export class Battle {
     if (!alive(s)) return;
     const rng = this.rng;
     const isMyConsort = s.team === 'p';
-    if (isMyConsort && this.formUp) {
+    const eff = s.loyalty !== undefined ? loyaltyEffect(s.loyalty) : null;
+    // a mutinous consort won't break off to form on you — she ignores the order
+    if (isMyConsort && this.formUp && (!eff || eff.obeysFormUp)) {
       const lead = this.P();
       const idx = this.ships.indexOf(s);
       const back = normAng(lead.heading + Math.PI);
@@ -423,10 +434,43 @@ export class Battle {
     } else {
       s.ammo = 0;
     }
+    // devoted crews fire eagerly; mutinous ones drag their feet
+    const fireRate = dt * 6 * (eff ? eff.fireMul : 1);
     for (let side = 0; side < 2; side++) {
-      if (s.reload[side] <= 0 && s.gunsLeft[side] > 0 && this.inArc(s, foe, side) && rng.random() < dt * 6) {
+      if (s.reload[side] <= 0 && s.gunsLeft[side] > 0 && this.inArc(s, foe, side) && rng.random() < fireRate) {
         this.fire(s, side);
       }
+    }
+  }
+
+  /* ============ loyalty: the armada as a crew of people ============ */
+
+  /** Nudge a consort's morale, clamp it, and let her speak. An explicit `key`
+   *  barks that reaction; otherwise a slip into a worse band announces itself
+   *  (so desertion is always telegraphed, never a surprise). */
+  private adjustLoyalty(s: Ship, delta: number, key?: BarkKey): void {
+    if (s.loyalty === undefined || !s.captain) return;
+    const before = loyaltyBand(s.loyalty);
+    s.loyalty = clampLoyalty(s.loyalty + delta);
+    const after = loyaltyBand(s.loyalty);
+    let line: string | null = null;
+    if (key) {
+      line = bark(s.captain, key, this.rng);
+    } else if (delta < 0 && after !== before && (after === 'wary' || after === 'mutinous')) {
+      line = bark(s.captain, after, this.rng);
+    }
+    if (line) this.events.feed(line);
+  }
+
+  /** Every few seconds, ask each consort whether she likes how she's being
+   *  fought, and drift her morale. Slow on purpose — loyalty is a relationship. */
+  private sampleLoyalty(): void {
+    for (const s of this.fleet('p')) {
+      if (s === this.P() || !alive(s) || s.loyalty === undefined || !s.doctrine) continue;
+      const foe = this.nearestEnemy(s);
+      const range = foe ? dist(s, foe) : 9999;
+      const c = tacticalContent(s.doctrine, range, this.formUp);
+      if (c !== 0) this.adjustLoyalty(s, c * LOYALTY.contentStep);
     }
   }
 
@@ -436,20 +480,36 @@ export class Battle {
     if (this.phase !== 'sail') return;
     let k = 0;
     let any = false;
+    let refused = false;
     for (const s of this.fleet('p')) {
       if (s === this.P() || !alive(s)) continue;
+      const eff = s.loyalty !== undefined ? loyaltyEffect(s.loyalty) : null;
       const foe = this.nearestEnemy(s);
+      let firedThis = false;
       for (let side = 0; side < 2; side++) {
         if (s.reload[side] <= 0 && s.gunsLeft[side] > 0 && this.inArc(s, foe, side)) {
-          this.pendingFires.push({ ship: s, side, t: 0.18 + k * 0.32 });
+          // a mutinous crew may simply not answer the gun
+          if (eff && eff.mayRefuseSignal && this.rng.random() < 0.5) {
+            if (!refused && s.captain) {
+              const line = bark(s.captain, 'resent', this.rng);
+              if (line) this.events.feed(line);
+              refused = true;
+            }
+            continue;
+          }
+          this.pendingFires.push({ ship: s, side, t: 0.18 + k * 0.32 + (eff ? eff.signalDelay : 0) });
           k++;
           any = true;
+          firedThis = true;
         }
       }
+      if (firedThis && s.loyalty !== undefined) this.adjustLoyalty(s, LOYALTY.signalUsed);
     }
     if (any) {
       this.events.boom(0.35, 0.2, 900);
       this.events.feed('Signal gun — fleet fires!');
+    } else if (refused) {
+      this.events.feed('Signal — and your fleet pretends not to hear');
     } else {
       this.events.feed('Signal — no consort has a target in arc');
     }
@@ -469,6 +529,15 @@ export class Battle {
   toggleOrder(): void {
     this.formUp = !this.formUp;
     this.events.feed(this.formUp ? 'Fleet signal — form on me' : 'Fleet signal — engage the enemy');
+    // the order lands differently on each temperament; one of them says so
+    let spoke = false;
+    for (const s of this.fleet('p')) {
+      if (s === this.P() || !alive(s) || s.loyalty === undefined || !s.doctrine) continue;
+      const r = orderReaction(s.doctrine, this.formUp);
+      if (!r) continue;
+      this.adjustLoyalty(s, r.d, spoke ? undefined : r.key);
+      spoke = true;
+    }
   }
 
   takeHelm(idx: number): boolean {
@@ -672,6 +741,8 @@ export class Battle {
     run.pendingPrizes = [];
     let salvage = 0;
     let pressed = 0;
+    let prizesTaken = 0;
+    let shipsSunk = 0;
     for (const s of this.ships) {
       if (s.team !== 'e') continue;
       if (s.struck) {
@@ -679,6 +750,7 @@ export class Battle {
         run.pendingPrizes.push({ cls: s.cls, name: s.name, crew: Math.round(s.crew) });
         pressed += Math.round(s.crew * (EASY.on ? EASY.pressedFrac : 0.25));
         run.stats.prizes++;
+        prizesTaken++;
         if (s.faction) applyKillRep(run, s.faction, 'take');
         rollPrizeLog(run, this.rng, this.events, 'full');
       } else {
@@ -692,6 +764,7 @@ export class Battle {
         const units = Math.min(room, Math.round(this.rng.rnd(2, 5)));
         if (units > 0) run.cargo[g.key] = (run.cargo[g.key] || 0) + units;
         run.stats.sunk++;
+        shipsSunk++;
         if (s.faction) applyKillRep(run, s.faction, 'sink');
         rollPrizeLog(run, this.rng, this.events, 'fragment');
         this.events.feed(
@@ -713,10 +786,26 @@ export class Battle {
       rudderHP: f.rudderHP,
       gunDef: [f.gunsMax - f.gunsLeft[0], f.gunsMax - f.gunsLeft[1]],
     };
-    // surviving consorts keep their place
-    run.armada = this.ships
-      .filter((s) => s.team === 'p' && s !== f && alive(s))
-      .map((s) => ({ cls: s.cls, name: s.name, captain: s.captain! }));
+    // surviving consorts keep their place — and carry home a verdict on the
+    // fight: you led them to a win (+), but did you spend their hull, take
+    // prizes or just sink everything?
+    const onlySunk = prizesTaken === 0 && shipsSunk > 0;
+    const survivors = this.ships.filter((s) => s.team === 'p' && s !== f && alive(s));
+    run.armada = survivors.map((s) => {
+      let loy = (s.loyalty ?? LOYALTY.start) + LOYALTY.victory;
+      if (s.hull < s.maxHull * 0.25) loy += s.doctrine === 'bulldog' ? LOYALTY.bulldogMauled : LOYALTY.mauled;
+      if (s.doctrine === 'corsair') loy += prizesTaken > 0 ? LOYALTY.corsairPrize : onlySunk ? LOYALTY.corsairWaste : 0;
+      return { cls: s.cls, name: s.name, captain: s.captain!, loyalty: clampLoyalty(loy) };
+    });
+    // one survivor crows — but a Corsair only brags of a prize if one was taken
+    const speakers = prizesTaken > 0 ? survivors : survivors.filter((s) => s.doctrine !== 'corsair');
+    if (speakers.length) {
+      const v = speakers[this.rng.int(speakers.length)];
+      if (v.captain) {
+        const line = bark(v.captain, 'victory', this.rng);
+        if (line) this.events.feed(line);
+      }
+    }
     // pressed hands report aboard at once — losses refill themselves first,
     // and whatever's left waits in the pool for prize crews
     if (run.pool > 0 && run.flag.crewPct < 1) {
@@ -749,6 +838,12 @@ export class Battle {
       for (const s of this.ships) if (s !== me) this.updateAI(s, dt);
       for (const s of this.ships) this.updateShip(s, dt);
       this.updatePending(dt);
+      // consorts quietly judge how you're fighting them
+      this.loyaltyT += dt;
+      if (this.loyaltyT >= LOYALTY.sampleS) {
+        this.loyaltyT = 0;
+        this.sampleLoyalty();
+      }
       // collision separation
       for (let i = 0; i < this.ships.length; i++) {
         for (let j = i + 1; j < this.ships.length; j++) {
