@@ -19,7 +19,8 @@ import * as boarding from './boarding';
 import { BOARD_CFG } from './boardingConfig';
 import type { BoardingState } from './boarding';
 import type { RunState } from './types';
-import { flagStats, topUpCrew } from './run';
+import { applyKillRep, flagStats, topUpCrew } from './run';
+import { GOODS, cargoLoad, fleetCargoCap } from './economy';
 import { EASY } from './easing';
 
 export type BattleOutcome =
@@ -674,12 +675,28 @@ export class Battle {
     for (const s of this.ships) {
       if (s.team !== 'e') continue;
       if (s.struck) {
+        // taken: a prize (richest path) + her log + restraint with her flag
         run.pendingPrizes.push({ cls: s.cls, name: s.name, crew: Math.round(s.crew) });
         pressed += Math.round(s.crew * (EASY.on ? EASY.pressedFrac : 0.25));
         run.stats.prizes++;
+        if (s.faction) applyKillRep(run, s.faction, 'take');
       } else {
-        salvage += 18;
+        // sunk: a thinner purse, but the chop gives up cargo and a few souls
+        const coin = Math.round(this.rng.rnd(5, 10));
+        salvage += coin;
+        const men = Math.round(this.rng.rnd(2, 5));
+        run.pool += men;
+        const g = this.rng.pick(GOODS);
+        const room = Math.max(0, fleetCargoCap(run) - cargoLoad(run));
+        const units = Math.min(room, Math.round(this.rng.rnd(2, 5)));
+        if (units > 0) run.cargo[g.key] = (run.cargo[g.key] || 0) + units;
         run.stats.sunk++;
+        if (s.faction) applyKillRep(run, s.faction, 'sink');
+        this.events.feed(
+          s.name + ' goes under — ' +
+          (units > 0 ? units + ' ' + g.name.toLowerCase() + ' bobbing free, ' : '') +
+          men + ' souls fished from the chop',
+        );
       }
     }
     run.stores += salvage;

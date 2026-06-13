@@ -25,9 +25,12 @@ export function rudderFac(s: Ship): number {
   return s.rudderHP <= 0 ? 0.3 : s.rudderHP < 50 ? 0.7 : 1;
 }
 
-/** FEEL: sweeps. A furled ship is rowed at a crawl instead of parking dead —
- *  speed scales with the hands left to pull the oars. (11→18, 2026-06-12) */
-const ROW_SPEED = 18;
+/** FEEL: sweeps. A furled ship is rowed by hand — class-relative so it reads
+ *  as a *slight* edge over sailing dead into the wind (whose efficiency floor
+ *  is ~0.05). ROW_EFF 0.075 ≈ 1.5× the in-irons crawl at full crew, and well
+ *  below any real point of sail, so you only furl-and-row when truly head to
+ *  wind. Scales with the hands left to pull the sweeps. (2026-06-13) */
+const ROW_EFF = 0.075;
 
 /** FEEL: global pace amp (2026-06-12 human directive: "amp up speed overall,
  *  tighter turning"). Applies to EVERY ship equally — relative balance and
@@ -50,7 +53,8 @@ export function stepShipPhysics(s: Ship, windDir: number, dt: number): void {
   const eff = s.ghost ? Math.max(windEff(s.heading, windDir), 0.85) : windEff(s.heading, windDir);
   let tgt = s.maxSpd * SPEED_AMP * SAILS[s.sailIdx] * eff * (0.3 + 0.7 * s.sailHP / 100);
   if (s.sailIdx === 0 && !s.ghost) {
-    tgt = Math.max(tgt, ROW_SPEED * (0.3 + 0.7 * (s.crew / s.maxCrew)));
+    // furled: row at a class-relative crawl, scaled by surviving crew
+    tgt = s.maxSpd * SPEED_AMP * ROW_EFF * (0.3 + 0.7 * (s.crew / s.maxCrew));
   }
   const rate = tgt > s.speed ? 0.7 : 1.4;
   s.speed += (tgt - s.speed) * clamp(dt * rate, 0, 1);

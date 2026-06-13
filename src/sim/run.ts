@@ -3,6 +3,7 @@
 
 import { CAPTAINS, CLASSES, CREW_COST, PRIZE_VALUE, STRIP_LOOT } from './constants';
 import type { ClassDef, ShipClass } from './constants';
+import type { FactionKey } from './worldgen';
 import { clamp } from './math';
 import { Rng } from './rng';
 import type { RunState } from './types';
@@ -40,6 +41,27 @@ export function flagStats(run: RunState): ClassDef {
     len: c.len,
     beam: c.beam,
   };
+}
+
+/* ============ reputation: how the sea remembers your violence ============ */
+
+const repBump = (run: RunState, k: FactionKey, d: number): void => {
+  run.rep[k] = clamp(run.rep[k] + d, -100, 100);
+};
+
+/**
+ * A ship of `faction` was defeated. `mode` is how: 'take' (struck/boarded,
+ * prisoners spared — restraint) or 'sink' (no quarter — feared).
+ * Sinking costs you ~2× the standing with the faction you sank, and the
+ * Brethren admire butchery while the Crown abhors it. Taking is the gentler,
+ * more "honorable" path — and it still pays more in goods elsewhere.
+ */
+export function applyKillRep(run: RunState, faction: FactionKey, mode: 'take' | 'sink'): void {
+  const sink = mode === 'sink';
+  repBump(run, faction, sink ? -16 : -9); // the victim's flag remembers
+  if (faction !== 'brethren') repBump(run, 'brethren', sink ? 6 : 2); // the Brethren respect no quarter
+  if (faction !== 'crown') repBump(run, 'crown', sink ? -3 : 0); // the Crown abhors butchery at sea
+  if (faction === 'brethren') repBump(run, 'crown', 2); // killing pirates pleases the Crown a little
 }
 
 /* ============ harbor actions ============ */

@@ -9,7 +9,7 @@ import { stepShipPhysics } from './physics';
 import { EventQueue } from './events';
 import { Rng } from './rng';
 import { makeShip } from './battle';
-import { flagStats } from './run';
+import { applyKillRep, flagStats } from './run';
 import type { RunState, Ship } from './types';
 import {
   CONTACT_TABLES, ISLANDS, MIST_CONTACT, MIST_ESCALATION, MIST_FEED, PORTS,
@@ -477,10 +477,8 @@ export class World {
       this.events.feed('Her papers, strongbox and dignity are yours: +' + enc.loot + ' stores.');
     }
     if (enc.faction) {
-      run.rep[enc.faction] = Math.max(-100, run.rep[enc.faction] - 22);
-      if (enc.faction === 'crown') run.rep.brethren = Math.min(100, run.rep.brethren + 8);
-      if (enc.faction === 'compania') run.rep.brethren = Math.min(100, run.rep.brethren + 6);
-      if (enc.faction === 'brethren') run.rep.crown = Math.min(100, run.rep.crown + 7);
+      // optional map captures are takes (a prize boarded, not put under)
+      applyKillRep(run, enc.faction, 'take');
     }
     if (enc.ghost) {
       this.events.feed('What it was carrying glints like coin and smells like low tide. Salt-silver spends fine.');
