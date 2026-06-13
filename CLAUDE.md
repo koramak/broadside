@@ -27,8 +27,9 @@ npm run build    # tsc --noEmit + vite build  (the only "test" — there is no t
   - `physics.ts` shared sailing (wind curve, committed turn, rowing floor, pace amp) — used by battle AND map
   - `battle.ts` arena sim (gunnery, straddle aim, AI doctrines, damage/rake, boarding entry, battleWon, rep + ship's-log calls)
   - `boarding.ts` tap-timing station deck-fight · `boardingConfig.ts` ALL boarding FEEL dials
-  - `run.ts` meta-layer: flagship persistence, stores, armada (+replaceConsort), prizes, `applyKillRep`, `rollPrizeLog`, `chronicle`, harbor ops, chandler
-  - `economy.ts` goods/pricing/`refreshRumors` · `world.ts` sea-map sim (contacts, crates, docking, encounters, shipwrecks, consort formation)
+  - `run.ts` meta-layer: flagship persistence, stores, armada (+replaceConsort/carouse/desertionSweep), `hoistFlag` (flagship trade-up), prizes, `applyKillRep`, `rollPrizeLog`, `chronicle`, harbor ops, chandler
+  - `captains.ts` consort temperament + loyalty + the Disco-Elysium voice (FEEL dials + barks; read by battle/harbor/hud) · `contracts.ts` tavern job board (delivery/smuggle/bounty: generation, deadlines, completion)
+  - `economy.ts` goods/pricing/`refreshRumors` · `world.ts` sea-map sim (contacts, crates, docking, encounters, shipwrecks, consort formation, contract deadlines + bounty spawns)
   - `worldgen.ts` authored archipelago (islands, 6 ports + 2 secret, factions, story marks, Mist waves, `knownPorts`) · `objectives.ts` guided tutorial chain + tutorial-wind rig
   - `events.ts` sim→frontend queue · `easing.ts` testing-difficulty switch · `tuning.ts` pause-menu combat dials
 - `src/render/` — reads sim, owns Three.js. `renderer.ts` SceneShell (oblique camera + boarding focus-glide, GPU sea shader, Mist mood) · `shipView.ts` per-ship meshes/damage/rings (×2 visual scale) · `worldView.ts` map scene (islands, ports+nameplates, objective marker, contacts, consorts, crates, Mist wall) · `models.ts` Kenney GLB loader + name mapping · `effects.ts` smoke/impact/splash/wake/ball tracers.

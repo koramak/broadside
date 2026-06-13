@@ -4,7 +4,7 @@ Companion to CLAUDE.md (which holds locked canon + the file map / how-to-run).
 This file tracks what's actually built, what's in flight, and what's undecided.
 Keep it honest: describe what the code does, not what it's meant to do.
 
-_Last updated: 2026-06-13, end of the "intelligence & consequences" batch. Working tree clean; everything below is committed and deployed._
+_Last updated: 2026-06-13, end of the "armada as characters / job board / trade-up" batch. Working tree clean; everything below is committed (push to deploy)._
 
 ## System status
 
@@ -14,6 +14,9 @@ _Last updated: 2026-06-13, end of the "intelligence & consequences" batch. Worki
 | Gunnery (straddle aim, ammo, rake, subsystems, weather gauge) | **working** | Ported from the slice, constants in `constants.ts`. Pause-menu dials (ball speed / reload / rake) live in `tuning.ts`. |
 | Enemy AI (Bulldog/Surgeon/Corsair doctrines) | **working** | In `battle.ts`. Corsair stern-rake hunting is the skill check. |
 | Armada (2 consorts, signal gun, engage/form-on-me, possession) | **working** | Cap stays 2. `replaceConsort` swaps when full (pay one off for ½ value). Consorts also sail the chart in formation. |
+| Consort captains as characters (temperament + loyalty + voice) | **working** | `captains.ts`. Each consort has a doctrine-borne TEMPERAMENT (creed/loves/hates) and a LOYALTY that drifts with use: orders for/against type, signal use, a contentment sample, battle-end verdict. High → fights harder + obeys instantly; mutinous → refuses signals, ignores form-up, deserts (≤6) with her hull. CAROUSE buys goodwill back. Disco-Elysium barks in the feed; mood on chips + harbor cards. |
+| Flagship trade-up (HOIST YOUR FLAG) | **working** | `run.hoistFlag`. Any prize can become your flagship; crew + refits carry, she comes worn (hull 60%), old hull sold for prize value. Chart ship + mesh rebuild on class change. The Plate Ship is now sailable. |
+| Tavern contracts & bounties (job board) | **working** | `contracts.ts`. Per-port board (faction-shaped): delivery, smuggle (draws Crown hunters + rep swing), bounty (named quarry spawns + hunts). Deadlines on the day clock; lapse costs standing. Active articles on port/chart HUD + cyan dest marks. Escort NOT yet shipped (needs friendly-NPC protection AI). |
 | 6-action story → Plate Ship → 3 Mist actions → THE HARROW | **working** | `worldgen.ESCALATION` (locked) + Mist waves. Ghosts ignore the wind curve (the one shipped rule-breaker). |
 | Sea map (real-time wind sailing, contacts flee/hunt/lane, pursuit give-up, crates) | **working** | `world.ts`. Mortals won't enter the Mist; ghosts won't leave it. |
 | Trading economy (6 goods, port bias, day wobble) | **working** | `economy.ts`. Sinking now also drops floating cargo + rescued men. |
@@ -51,9 +54,20 @@ The mechanic, as built: tap a station → ring fills white (prime) → **gold wi
 - **Fog-of-war for normal ports** — decided AGAINST for now (all open ports visible from the start; logs reveal only the *secret* ones). Revisit later if discovery should bite harder.
 
 ## Immediate next feature
-Awaiting the human to pick from the brainstorm (delivered 2026-06-13). My recommendation, in order:
-1. **Consort captains as characters** — temperament + loyalty that reacts to how you use them (the uncracked "armada" pillar; home for the Disco-Elysium voice). *Top pick.*
-2. **Tavern contracts / bounties** — escort/hunt/smuggle jobs; highest content-per-effort, reuses rep + factions + trade + map.
-3. **Flagship trade-up** — move your flag to a captured hull; the missing progression payoff.
+The three top brainstorm picks all shipped in the 2026-06-13 batch (consort
+captains, contracts/bounties, flagship trade-up). All are TUNING-open, not
+design-open — playtest verdicts wanted on:
+- **Loyalty cadence** — does the slow drift make desertion feel earned, or too
+  rare / too punishing? `LOYALTY` dials in `captains.ts`. Desert threshold 6.
+- **Contract economy** — delivery payouts (×1.7 of base) and deadlines; whether
+  the smuggle "blockade" (hunter chance ×0.5) bites. Dials in `contracts.ts`.
+- **Trade-up condition** — hoisted hull starts at 60%; is selling the old flag
+  the right call vs keeping her as a consort? (`HOIST_HULL_PCT` / `hoistFlag`.)
 
-Fuller backlog (also raised, not lost): spyglass enemy-intel; boarding-assist consort order; mid-battle wind shifts; crew-quality refit (the `surgeonsMate` hook in boardingConfig is reserved for this); notoriety-driven navy hunts/blockades; contraband & searches; port events; price impact from your own trades; meta-progression between runs; branching route map; legendary recruitable rival captains; interactive port vignettes; **the boarding melee crowds** (deferred presentation piece); weather/day-night, screen-shake.
+Next from the backlog (human to pick): **escort contracts** (the one contract
+type deferred — needs a friendly NPC that paths to a port and can be attacked);
+the **boarding melee crowds** (deferred presentation piece); spyglass enemy-
+intel; boarding-assist consort order; mid-battle wind shifts; crew-quality refit
+(the `surgeonsMate` hook in boardingConfig is reserved for this); port events;
+price impact from your own trades; meta-progression between runs; branching
+route map; legendary recruitable rival captains; weather/day-night, screen-shake.
