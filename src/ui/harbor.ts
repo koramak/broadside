@@ -1,7 +1,7 @@
 // Harbor screen between actions: repairs, armada roster, prize decisions.
 // Ported from the prototype; logic lives in sim/run.ts, this is just DOM.
 
-import { CLASSES, STRIP_LOOT, PRIZE_VALUE } from '../sim/constants';
+import { CLASSES, DOCTRINES, STRIP_LOOT, PRIZE_VALUE } from '../sim/constants';
 import * as runOps from '../sim/run';
 import type { RunState } from '../sim/types';
 import { Rng } from '../sim/rng';
@@ -18,9 +18,12 @@ export interface HarborOpts {
 export class HarborScreen {
   onSetSail: () => void = () => {};
   private opts: HarborOpts = { title: 'BETWEEN ACTIONS', nextLabel: 'SET SAIL', atSea: false };
+  /** which pending prize's "replace a consort" picker is open (-1 = none) */
+  private replacingIdx = -1;
 
   show(run: RunState, rng: Rng, opts: HarborOpts): void {
     this.opts = opts;
+    this.replacingIdx = -1;
     $('harbor').style.display = 'flex';
     $('htitle').textContent = opts.title;
     this.render(run, rng);
@@ -105,20 +108,53 @@ export class HarborScreen {
         '<h3>PRIZE: ' + p.name + '</h3>' +
         '<div class="d">' + CLASSES[p.cls].name + ', ' + p.crew + ' prisoners aboard.<br>What is your pleasure, captain?</div>';
 
-      const take = document.createElement('button');
       const hands = runOps.prizeHands(p.cls);
       const short = runOps.prizeShortfall(run, p.cls);
-      const full = run.armada.length >= 2;
-      take.textContent =
-        'CREW HER — join armada (' + hands + ' hands' + (short > 0 ? ', hire ' + short + ' for ' + short + ' stores' : ', pool covers it') + ')';
-      if (full) take.textContent = 'CREW HER — armada is full (2/2)';
-      else if (run.stores < short) take.textContent = 'CREW HER — need ' + (short - run.stores) + ' more stores';
-      take.disabled = full || run.stores < short;
-      take.addEventListener('click', () => {
-        audio();
-        runOps.crewPrize(run, i, rng);
-        this.render(run, rng);
-      });
+      const full = run.armada.length >= runOps.ARMADA_CAP;
+      const take = document.createElement('button');
+      if (!full) {
+        take.textContent =
+          'CREW HER — join armada (' + hands + ' hands' +
+          (short > 0 ? ', hire ' + short + ' for ' + short + ' stores' : ', pool covers it') + ')';
+        if (run.stores < short) take.textContent = 'CREW HER — need ' + (short - run.stores) + ' more stores';
+        take.disabled = run.stores < short;
+        take.addEventListener('click', () => {
+          audio();
+          runOps.crewPrize(run, i, rng);
+          this.render(run, rng);
+        });
+        card.appendChild(take);
+      } else {
+        // armada full — offer a swap: pick a consort to pay off for her berth
+        take.textContent = this.replacingIdx === i
+          ? 'TAKE HER IN — choose who to pay off:'
+          : 'TAKE HER IN — replace a consort (' + run.armada.length + '/' + runOps.ARMADA_CAP + ')';
+        take.disabled = run.stores < short;
+        take.addEventListener('click', () => {
+          audio();
+          this.replacingIdx = this.replacingIdx === i ? -1 : i;
+          this.render(run, rng);
+        });
+        card.appendChild(take);
+        if (this.replacingIdx === i) {
+          run.armada.forEach((a, ci) => {
+            const doc = DOCTRINES[a.captain[1]];
+            const drop = document.createElement('button');
+            drop.textContent =
+              '↳ drop ' + CLASSES[a.cls].name + ' ' + a.name.split(' ').slice(-1)[0] +
+              ' · ' + (doc ? doc.label.split(' · ')[0] : 'Capt ' + a.captain[0]) +
+              ' (+' + runOps.consortPayoff(a.cls) + ' stores)';
+            drop.disabled = run.stores < short;
+            drop.addEventListener('click', () => {
+              audio();
+              runOps.replaceConsort(run, i, ci, rng);
+              this.replacingIdx = -1;
+              this.render(run, rng);
+            });
+            card.appendChild(drop);
+          });
+        }
+      }
 
       const strip = document.createElement('button');
       strip.textContent = 'STRIP HER — ' + loot[1] + ' (+12 stores)';
@@ -137,7 +173,6 @@ export class HarborScreen {
         this.render(run, rng);
       });
 
-      card.appendChild(take);
       card.appendChild(strip);
       card.appendChild(sell);
       pz.appendChild(card);

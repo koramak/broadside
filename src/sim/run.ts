@@ -157,6 +157,14 @@ export function buyChandler(run: RunState, item: ChandlerItem): boolean {
 
 /* ============ prize decisions ============ */
 
+/** Max consorts under your flag (3 ships total with the flagship). */
+export const ARMADA_CAP = 2;
+
+/** Stores recovered for paying off a consort you release to a lieutenant. */
+export function consortPayoff(cls: ShipClass): number {
+  return Math.round(PRIZE_VALUE[cls] * 0.5);
+}
+
 /** Hands a prize needs; eased during testing. */
 export function prizeHands(cls: ShipClass): number {
   return Math.round(CREW_COST[cls] * (EASY.on ? EASY.crewCostMul : 1));
@@ -174,12 +182,29 @@ export function crewPrize(run: RunState, i: number, rng: Rng): boolean {
   if (!p) return false;
   const hands = prizeHands(p.cls);
   const buy = prizeShortfall(run, p.cls);
-  if (run.armada.length >= 2 || run.stores < buy) return false;
+  if (run.armada.length >= ARMADA_CAP || run.stores < buy) return false;
   run.pool = Math.max(0, run.pool - hands);
   run.stores -= buy;
   const cap = CAPTAINS[Math.floor(rng.rnd(CAPTAINS.length))];
   run.armada.push({ cls: p.cls, name: p.name, captain: cap });
   run.pendingPrizes.splice(i, 1);
+  return true;
+}
+
+/** Take a prize into a full armada by paying off the consort at `consortIdx`. */
+export function replaceConsort(run: RunState, prizeIdx: number, consortIdx: number, rng: Rng): boolean {
+  const p = run.pendingPrizes[prizeIdx];
+  const released = run.armada[consortIdx];
+  if (!p || !released) return false;
+  const buy = prizeShortfall(run, p.cls);
+  if (run.stores < buy) return false;
+  run.stores += consortPayoff(released.cls); // she's sold off down the coast
+  run.armada.splice(consortIdx, 1);
+  run.pool = Math.max(0, run.pool - prizeHands(p.cls));
+  run.stores -= buy;
+  const cap = CAPTAINS[Math.floor(rng.rnd(CAPTAINS.length))];
+  run.armada.push({ cls: p.cls, name: p.name, captain: cap });
+  run.pendingPrizes.splice(prizeIdx, 1);
   return true;
 }
 
