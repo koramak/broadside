@@ -341,7 +341,7 @@ export class Battle {
       tgt.mastStage = stage;
       this.events.feed(stage === 1 ? 'Topmasts hit — ' + tgt.name : 'Mast down — ' + tgt.name + ' is crawling');
     }
-    this.events.boom(0.16, 0.18, 700);
+    // the woody hit sound is played off the 'impact' event (audio.woodHit)
     if (tgt.hull <= 0 && !tgt.sinking) tgt.sinking = 0.001;
     if (tgt.crew <= Math.max(6, tgt.maxCrew * 0.08) && !tgt.struck && !tgt.sinking) {
       if (tgt.ghost) {

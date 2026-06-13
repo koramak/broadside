@@ -22,7 +22,7 @@ import { HarborScreen } from './ui/harbor';
 import { PortScreen } from './ui/port';
 import { Input } from './input/input';
 import { Minimap, BigMap } from './ui/minimap';
-import { audio, boom, setMusic, boardTick, boardFoul } from './audio';
+import { audio, boom, setMusic, boardTick, boardFoul, woodHit, splash } from './audio';
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 import { refreshRumors } from './sim/economy';
 import { PORTS } from './sim/worldgen';
@@ -425,9 +425,11 @@ function frame(now: number): void {
           break;
         case 'impact':
           effects.impact(e.x, e.y);
+          woodHit(0.4);
           break;
         case 'splash':
           effects.splash(e.x, e.y);
+          splash(0.26);
           break;
         case 'wake':
           effects.wake(e.x, e.y);

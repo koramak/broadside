@@ -50,6 +50,7 @@ export function audio(): void {
   if (AC && !ambientOn) {
     ambientOn = true;
     startAmbient(AC);
+    void tryLoadSamples(AC);
   }
   startMusic();
 }
@@ -147,20 +148,126 @@ export function boardFoul(): void {
   src.start();
 }
 
+/* ---------- optional sample override ----------
+ * Drop CC0 files at public/assets/sfx/<name>.mp3 and they layer over (and
+ * largely replace) the synth automatically — no code change. Missing files are
+ * ignored, so the rich synthesis below is always the floor. Log any added file
+ * in ASSETS.md. Names: cannon, hit, splash. */
+const SAMPLES: Record<string, AudioBuffer | null> = {};
+let samplesTried = false;
+
+async function tryLoadSamples(ac: AudioContext): Promise<void> {
+  if (samplesTried) return;
+  samplesTried = true;
+  for (const name of ['cannon', 'hit', 'splash']) {
+    try {
+      const res = await fetch('assets/sfx/' + name + '.mp3');
+      if (!res.ok) continue;
+      SAMPLES[name] = await ac.decodeAudioData(await res.arrayBuffer());
+    } catch {
+      /* no sample — synth carries it */
+    }
+  }
+}
+
+function playSample(name: string, vol: number): boolean {
+  const buf = SAMPLES[name];
+  if (!AC || !buf) return false;
+  const src = AC.createBufferSource();
+  src.buffer = buf;
+  const g = AC.createGain();
+  g.gain.value = vol;
+  src.connect(g);
+  g.connect(AC.destination);
+  src.start();
+  return true;
+}
+
+/** White-noise burst buffer, shaped by an envelope exponent. */
+function noiseBuf(len: number, exp: number): AudioBuffer {
+  const b = AC!.createBuffer(1, Math.max(1, Math.floor(AC!.sampleRate * len)), AC!.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, exp);
+  return b;
+}
+
+/**
+ * Layered report. Low freq (cannon: a sub-thump + powder crack + smoke-rumble
+ * tail) reads as black powder; high freq (a shot striking timber) as a woody
+ * thunk. The richer synthesis is the guaranteed floor; a cannon.mp3 sample, if
+ * present, layers on top for the gun report.
+ */
 export function boom(vol = 0.5, len = 0.35, freq = 300): void {
   if (!AC) return;
   const t = AC.currentTime;
-  const buf = AC.createBuffer(1, AC.sampleRate * len, AC.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2.2);
+  const cannon = freq < 420;
+
+  if (cannon) {
+    if (SAMPLES.cannon) playSample('cannon', vol);
+    // sub-thump: a sine punched down in pitch
+    const osc = AC.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + Math.min(0.22, len));
+    const og = AC.createGain();
+    og.gain.setValueAtTime(vol * 0.9, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + len);
+    osc.connect(og);
+    og.connect(AC.destination);
+    osc.start(t);
+    osc.stop(t + len + 0.05);
+  }
+
+  // the body: filtered noise (powder crack → smoke rumble)
   const src = AC.createBufferSource();
-  src.buffer = buf;
+  src.buffer = noiseBuf(len, cannon ? 2.2 : 3.4);
   const f = AC.createBiquadFilter();
   f.type = 'lowpass';
-  f.frequency.value = freq;
+  f.frequency.setValueAtTime(freq * (cannon ? 3 : 1), t);
+  if (cannon) f.frequency.exponentialRampToValueAtTime(freq, t + len);
   const g = AC.createGain();
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  src.connect(f);
+  f.connect(g);
+  g.connect(AC.destination);
+  src.start();
+}
+
+/** A ball strikes timber — woody crack + splinter. */
+export function woodHit(vol = 0.4): void {
+  if (!AC) return;
+  if (playSample('hit', vol)) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource();
+  src.buffer = noiseBuf(0.18, 3.2);
+  const f = AC.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.value = 380;
+  f.Q.value = 1.1;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  src.connect(f);
+  f.connect(g);
+  g.connect(AC.destination);
+  src.start();
+}
+
+/** A ball finds only sea — a wet plume. */
+export function splash(vol = 0.3): void {
+  if (!AC) return;
+  if (playSample('splash', vol)) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource();
+  src.buffer = noiseBuf(0.4, 1.6);
+  const f = AC.createBiquadFilter();
+  f.type = 'highpass';
+  f.frequency.setValueAtTime(900, t);
+  f.frequency.exponentialRampToValueAtTime(2600, t + 0.3);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
   src.connect(f);
   f.connect(g);
   g.connect(AC.destination);

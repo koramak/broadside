@@ -32,3 +32,14 @@ System fonts only (Georgia / Courier New stacks). No bundled font files.
     > "Folk Round", "Master of the Feast" — Kevin MacLeod (incompetech.com).
     > Licensed under Creative Commons: By Attribution 4.0 — http://creativecommons.org/licenses/by/4.0/
   - Downloaded 2026-06-12 from incompetech.com.
+
+## Combat SFX (src/audio.ts)
+
+Cannon fire, timber hits, splashes, and the boarding station ticks are
+**procedurally synthesized** (Web Audio) — original, no third-party assets, no
+license encumbrance. An optional sample-override slot lives at
+`public/assets/sfx/` (`cannon.mp3` / `hit.mp3` / `splash.mp3`): drop genuinely
+CC0 files there and they layer over the synth automatically. None are bundled
+yet — sourcing verified-CC0 cannon samples by direct fetch wasn't reliable, so
+the synth ships as the default. Log any sample added here with its source + CC0
+license.
