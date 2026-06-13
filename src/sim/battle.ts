@@ -109,6 +109,7 @@ export class Battle {
     ];
     flag.name = CLASSES[run.flag.cls].name + ' Persistence';
     flag.captain = ['You', 'bulldog'];
+    this.gearSwivels = run.gear.swivels;
     this.ships.push(flag);
     this.ctrl = 0;
 
@@ -525,6 +526,8 @@ export class Battle {
 
   private boardNagAt = -9;
   private simClock = 0;
+  /** chandler swivel guns, snapshotted at battle start */
+  private gearSwivels = false;
 
   startBoarding(): void {
     const c = this.boardCheck();
@@ -541,7 +544,7 @@ export class Battle {
     }
     const foe = c.foe!;
     this.phase = 'board';
-    this.board = boarding.startBoarding(this.P(), foe);
+    this.board = boarding.startBoarding(this.P(), foe, this.gearSwivels);
     this.events.feed('GRAPPLES AWAY — boarding ' + foe.name);
     this.events.feed('1/2/3 send hands · Q swivel · G press the attack');
     this.events.boom(0.4, 0.5, 180);
@@ -565,7 +568,7 @@ export class Battle {
     }
   }
 
-  private updateBoarding(dt: number): void {
+  private updateBoarding(dt: number, run: RunState): void {
     const board = this.board!;
     this.P().speed *= 0.95;
     board.foe.speed *= 0.95;
@@ -573,10 +576,26 @@ export class Battle {
     if (board.done) {
       const me = this.P();
       me.crew = boarding.totalP(board);
-      board.foe.crew = boarding.totalE(board);
+      const remnant = boarding.totalE(board);
       if (board.done === 'taken') {
         board.foe.struck = true;
+        // the ones who broke and ran took the better deal: your shilling.
+        // Overwhelm them fast and most of her people live to row for you.
+        const surrendered = Math.round(remnant * 0.5);
+        const captured = Math.round(board.fled) + surrendered;
+        board.foe.crew = remnant - surrendered;
+        if (captured > 0) {
+          const room = Math.max(0, Math.round(me.maxCrew - me.crew));
+          const aboard = Math.min(captured, room);
+          me.crew += aboard;
+          run.pool += captured - aboard;
+          this.events.feed(
+            captured + ' of her people throw down their steel and take your shilling' +
+            (aboard > 0 ? ' — ' + aboard + ' fill your own thin ranks' : ''),
+          );
+        }
       } else {
+        board.foe.crew = remnant;
         me.struck = true;
       }
       this.board = null;
@@ -710,7 +729,7 @@ export class Battle {
       }
       this.checkOutcome(run);
     } else if (this.phase === 'board') {
-      this.updateBoarding(dt);
+      this.updateBoarding(dt, run);
       // updateBoarding may resolve the fight and flip us back to 'sail'
       if ((this.phase as BattlePhase) === 'sail') this.checkOutcome(run);
     } else {

@@ -37,11 +37,15 @@ export interface BoardingState {
   swivelTarget: { section: number; t: number } | null;
   press: boolean;
   done: 'taken' | 'repelled' | null;
+  /** swivel guns mounted on the rails (chandler gear): hits +25% */
+  swivels: boolean;
+  /** defenders who broke and ran below rather than die — captives if you win */
+  fled: number;
   private_tickT: number;
   private_aiT: number;
 }
 
-export function startBoarding(me: Ship, foe: Ship): BoardingState {
+export function startBoarding(me: Ship, foe: Ship, swivels = false): BoardingState {
   const pTotal = Math.round(me.crew);
   const eTotal = Math.round(foe.crew);
   const wave = Math.round(pTotal * 0.4);
@@ -59,6 +63,8 @@ export function startBoarding(me: Ship, foe: Ship): BoardingState {
     swivelTarget: null,
     press: false,
     done: null,
+    swivels,
+    fled: 0,
     private_tickT: 0,
     private_aiT: 2.0,
   };
@@ -143,7 +149,7 @@ export function stepBoarding(
       const pEff = Math.min(p, FOOTHOLD_CAP);
       const eEff = Math.min(e, FOOTHOLD_CAP);
       const pLoss = eEff * K * (b.press ? 1.25 : 0.8) * rng.rnd(0.8, 1.2) * (EASY.on ? EASY.boardLossToPlayer : 1);
-      const eLoss = pEff * K * (b.press ? 1.45 : 1.0) * rng.rnd(0.8, 1.2);
+      const eLoss = pEff * K * (b.press ? 1.45 : 1.0) * (b.swivels ? 1.25 : 1) * rng.rnd(0.8, 1.2);
       b.secP[i] = Math.max(0, p - pLoss);
       b.secE[i] = Math.max(0, e - eLoss);
       if (e > 0 && b.secE[i] <= 0.5) {
@@ -160,7 +166,12 @@ export function stepBoarding(
       events.feed('Their ' + SECTION_NAMES[i].toLowerCase() + ' breaks!');
       events.boom(0.18, 0.15, 900);
       for (const j of [i - 1, i + 1]) {
-        if (j >= 0 && j < 3) b.secE[j] *= 0.85;
+        if (j >= 0 && j < 3) {
+          // the cascade: neighbors see the rout and some throw down steel —
+          // they're not dead, they're captives-in-waiting below decks
+          b.fled += b.secE[j] * 0.15;
+          b.secE[j] *= 0.85;
+        }
       }
     }
     for (const i of routedP) {

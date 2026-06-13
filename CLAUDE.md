@@ -58,7 +58,9 @@ pressed hands 45% + auto-muster after victories, repair +50% for 8, starting
 stores 30, map wind never against the current objective, carpenter trickle-
 repairs hull to 35% at sea. Locked constants in constants.ts are untouched;
 flipping EASY.on off restores prototype-true balance. Sweeps (furled = slow
-rowing) and accel rates 0.7/1.4 are PERMANENT feel changes, outside the gate.
+rowing, 18u), accel rates 0.7/1.4, and the 2026-06-12 pace amp (all ships:
+speed ×1.15, turn ×1.2 — relative class balance preserved) are PERMANENT feel
+changes, outside the gate. Ship visuals draw at ×2 sim scale (render only).
 
 ## Current state (2026-06-12, autonomous build session)
 

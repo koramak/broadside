@@ -93,10 +93,22 @@ export interface Prize {
   crew: number;
 }
 
+export interface Rumor {
+  text: string;
+  good: string;
+  portId: string;
+  /** run-day the rumor was heard; goes stale after ~12 days */
+  day: number;
+}
+
 export interface RunState {
   battle: number;
   /** position in the guided objective chain (sim/objectives.ts) */
   objIdx: number;
+  /** tavern intelligence — real price spreads, irreverently worded */
+  rumors: Rumor[];
+  /** chandler gear: bolt-on historical upgrades */
+  gear: { swivels: boolean; pumps: boolean };
   stores: number;
   pool: number;
   up: Record<RefitKey, number>;

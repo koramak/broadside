@@ -26,8 +26,14 @@ export function rudderFac(s: Ship): number {
 }
 
 /** FEEL: sweeps. A furled ship is rowed at a crawl instead of parking dead —
- *  speed scales with the hands left to pull the oars. */
-const ROW_SPEED = 11;
+ *  speed scales with the hands left to pull the oars. (11→18, 2026-06-12) */
+const ROW_SPEED = 18;
+
+/** FEEL: global pace amp (2026-06-12 human directive: "amp up speed overall,
+ *  tighter turning"). Applies to EVERY ship equally — relative balance and
+ *  the locked class ratios are preserved; the whole dance just moves faster. */
+const SPEED_AMP = 1.15;
+const TURN_AMP = 1.2;
 
 /**
  * Advance heading, speed and position for a live ship. Committed turning:
@@ -37,12 +43,12 @@ const ROW_SPEED = 11;
  * ("make fast and slow a little faster"), and the rowing floor added.
  */
 export function stepShipPhysics(s: Ship, windDir: number, dt: number): void {
-  const spdFac = clamp(s.speed / s.maxSpd, 0, 1);
-  s.heading = normAng(s.heading + s.rudder * s.turn * rudderFac(s) * (0.35 + 0.65 * spdFac) * dt);
+  const spdFac = clamp(s.speed / (s.maxSpd * SPEED_AMP), 0, 1);
+  s.heading = normAng(s.heading + s.rudder * s.turn * TURN_AMP * rudderFac(s) * (0.35 + 0.65 * spdFac) * dt);
   // The Drowned ignore the point-of-sail curve. This is the rule-break the
   // whole run trains you to feel in your stomach.
   const eff = s.ghost ? Math.max(windEff(s.heading, windDir), 0.85) : windEff(s.heading, windDir);
-  let tgt = s.maxSpd * SAILS[s.sailIdx] * eff * (0.3 + 0.7 * s.sailHP / 100);
+  let tgt = s.maxSpd * SPEED_AMP * SAILS[s.sailIdx] * eff * (0.3 + 0.7 * s.sailHP / 100);
   if (s.sailIdx === 0 && !s.ghost) {
     tgt = Math.max(tgt, ROW_SPEED * (0.3 + 0.7 * (s.crew / s.maxCrew)));
   }

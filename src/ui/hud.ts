@@ -33,8 +33,8 @@ export class Hud {
     const el = document.createElement('div');
     el.textContent = msg;
     $('feed').appendChild(el);
-    this.feedItems.push({ el, t: 4 });
-    while (this.feedItems.length > 3) {
+    this.feedItems.push({ el, t: 9 });
+    while (this.feedItems.length > 4) {
       const o = this.feedItems.shift()!;
       o.el.remove();
     }
@@ -344,9 +344,13 @@ export class Hud {
 
     $('cargolist').innerHTML =
       'STORES ' + run.stores + ' · HOLD ' + cargoLoad(run) + '/' + fleetCargoCap(run) + '<br>' +
-      GOODS.filter((g) => (run.cargo[g.key] || 0) > 0)
+      (GOODS.filter((g) => (run.cargo[g.key] || 0) > 0)
         .map((g) => g.name + ' × ' + run.cargo[g.key])
-        .join(' · ') || '';
+        .join(' · ') || '') +
+      (run.rumors.length
+        ? '<br><span class="rumorhead">HEARD IN THE TAVERNS</span><br>' +
+          run.rumors.map((r) => '«' + r.text + '»').join('<br>')
+        : '');
 
     $('replist').innerHTML = FACTIONS.map((f) => {
       const r = run.rep[f.key];

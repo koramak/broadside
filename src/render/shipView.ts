@@ -10,6 +10,11 @@ import { ModelLibrary, shipModelName } from './models';
 
 const TEAM_TRIM = { p: 0xd9a441, e: 0xc4583a } as const;
 
+/** FEEL (2026-06-12): miniatures read too small from the oblique camera —
+ *  all ship visuals are drawn at twice sim scale. Sim lengths are untouched;
+ *  gameplay distances, arcs and collisions are exactly as before. */
+export const SHIP_VISUAL_SCALE = 2;
+
 export class ShipView {
   group = new THREE.Group();
   private sails: THREE.Mesh[] = [];
@@ -23,7 +28,7 @@ export class ShipView {
 
   constructor(public ship: Ship, lib: ModelLibrary, modelOverride?: string) {
     const name = modelOverride ?? (ship.ghost ? 'ship-ghost' : shipModelName(ship.cls, ship.team, ship.faction));
-    const model = lib.instantiateShip(name, ship.len * 1.06);
+    const model = lib.instantiateShip(name, ship.len * 1.06 * SHIP_VISUAL_SCALE);
     this.group.add(model.root);
 
     if (ship.ghost) {
@@ -54,16 +59,18 @@ export class ShipView {
 
     // strike flag (white) above the deck when she surrenders
     this.strikeFlag = new THREE.Mesh(
-      new THREE.PlaneGeometry(11, 7),
+      new THREE.PlaneGeometry(11 * SHIP_VISUAL_SCALE, 7 * SHIP_VISUAL_SCALE),
       new THREE.MeshBasicMaterial({ color: 0xe9dcbe, side: THREE.DoubleSide }),
     );
-    this.strikeFlag.position.set(0, ship.len * 0.72, 0);
+    this.strikeFlag.position.set(0, ship.len * 0.72 * SHIP_VISUAL_SCALE, 0);
     this.strikeFlag.visible = false;
     this.group.add(this.strikeFlag);
 
-    // ring under the ship you steer (gold) / subtle rust ring for enemies
+    // allegiance ring — the one color language of the whole game:
+    // GOLD ring = yours (bright when you hold her helm), RUST ring = enemy
+    const ringR = ship.len * 0.62 * SHIP_VISUAL_SCALE;
     this.selRing = new THREE.Mesh(
-      new THREE.RingGeometry(ship.len * 0.62, ship.len * 0.62 + 3, 36),
+      new THREE.RingGeometry(ringR, ringR + 6, 40),
       new THREE.MeshBasicMaterial({
         color: TEAM_TRIM[ship.team],
         transparent: true,
@@ -130,8 +137,11 @@ export class ShipView {
 
     this.strikeFlag.visible = s.struck && !s.dead;
     if (this.strikeFlag.visible) this.strikeFlag.rotation.y = time * 0.7;
-    this.selRing.visible = (controlled || s.team === 'e') && s.sinking === 0 && !s.struck;
-    (this.selRing.material as THREE.MeshBasicMaterial).opacity = controlled ? 0.5 : 0.16;
+    // every live ship wears its colors: bright gold = your helm, dim gold =
+    // your consorts, rust = enemy. No more guessing by the cut of her sails.
+    this.selRing.visible = s.sinking === 0 && !s.struck;
+    (this.selRing.material as THREE.MeshBasicMaterial).opacity =
+      controlled ? 0.85 : s.team === 'p' ? 0.4 : 0.55;
   }
 
   dispose(scene: THREE.Scene): void {

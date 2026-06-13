@@ -23,3 +23,12 @@ Planned: Kenney audio packs (CC0) in Milestone 6 — log them here when added.
 ## Fonts
 
 System fonts only (Georgia / Courier New stacks). No bundled font files.
+
+## Music
+
+- **"Folk Round"** and **"Master of the Feast"** — Kevin MacLeod (incompetech.com)
+  - Files: `public/assets/music/folk-round.mp3`, `public/assets/music/master-of-the-feast.mp3`
+  - License: Creative Commons **CC BY 4.0** (attribution required — keep this credit in any release):
+    > "Folk Round", "Master of the Feast" — Kevin MacLeod (incompetech.com).
+    > Licensed under Creative Commons: By Attribution 4.0 — http://creativecommons.org/licenses/by/4.0/
+  - Downloaded 2026-06-12 from incompetech.com.

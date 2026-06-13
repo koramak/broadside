@@ -12,6 +12,8 @@ export function newRun(): RunState {
   return {
     battle: 1,
     objIdx: 0,
+    rumors: [],
+    gear: { swivels: false, pumps: false },
     stores: EASY.on ? EASY.startingStores : 20,
     pool: 0,
     up: { canvas: 0, guns: 0, timbers: 0 },
@@ -96,6 +98,38 @@ export function musterCrew(run: RunState): boolean {
   run.pool = Math.max(0, run.pool - need);
   run.stores -= cost;
   run.flag.crewPct = clamp(run.flag.crewPct + need / fc.crew, 0, 1);
+  return true;
+}
+
+/* ============ the chandler: ship-oriented purchases ============ */
+/* Historically grounded bolt-ons. The refit axes (canvas/guns/timbers) share
+ * their ×3 caps with prize-stripping; gear is one-time. */
+
+export interface ChandlerItem {
+  key: 'guns' | 'canvas' | 'timbers' | 'swivels' | 'pumps';
+  label: string;
+  desc: string;
+  cost: number;
+}
+
+export const CHANDLER: ChandlerItem[] = [
+  { key: 'guns', label: 'LONG NINES', desc: '+1 cannon per side', cost: 25 },
+  { key: 'canvas', label: 'FRESH CANVAS', desc: '+8% speed', cost: 20 },
+  { key: 'timbers', label: 'SEASONED OAK', desc: '+20% hull', cost: 30 },
+  { key: 'swivels', label: 'SWIVEL GUNS', desc: 'rail guns — boarding hits +25%', cost: 22 },
+  { key: 'pumps', label: 'CHAIN PUMPS', desc: 'carpenter patches to 50% at sea', cost: 18 },
+];
+
+export function chandlerAvailable(run: RunState, item: ChandlerItem): boolean {
+  if (item.key === 'swivels' || item.key === 'pumps') return !run.gear[item.key];
+  return run.up[item.key] < 3;
+}
+
+export function buyChandler(run: RunState, item: ChandlerItem): boolean {
+  if (!chandlerAvailable(run, item) || run.stores < item.cost) return false;
+  run.stores -= item.cost;
+  if (item.key === 'swivels' || item.key === 'pumps') run.gear[item.key] = true;
+  else run.up[item.key]++;
   return true;
 }
 

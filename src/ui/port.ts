@@ -102,12 +102,37 @@ export class PortScreen {
       m.need <= 0,
     );
 
-    // tavern
+    // the chandler: bolt-on upgrades, paid in stores
+    const ch = document.createElement('h3');
+    ch.style.marginTop = '10px';
+    ch.textContent = 'THE CHANDLER';
+    sv.appendChild(ch);
+    for (const item of runOps.CHANDLER) {
+      const owned = !runOps.chandlerAvailable(run, item);
+      const b = document.createElement('button');
+      b.textContent = owned
+        ? item.label + ' — ' + (item.key === 'swivels' || item.key === 'pumps' ? 'fitted' : 'fully refitted')
+        : item.label + ' — ' + item.desc + ' — ' + item.cost + ' stores';
+      b.disabled = owned || run.stores < item.cost;
+      b.addEventListener('click', () => {
+        audio();
+        if (runOps.buyChandler(run, item)) this.onShipChanged();
+        this.render(run, day);
+      });
+      sv.appendChild(b);
+    }
+
+    // tavern: flavor + the rumor sheet (real price intelligence)
     const tv = $('ptavern');
     const rumor = port.tavern[(day + seed) % port.tavern.length];
     tv.innerHTML =
       '<h3>THE TAVERN</h3>' +
-      '<div class="d">«' + rumor + '»<br><br>' + faction.blurb + '</div>';
+      '<div class="d">«' + rumor + '»<br><br>' + faction.blurb + '</div>' +
+      (run.rumors.length
+        ? '<h3 style="margin-top:10px">WORTH KNOWING</h3><div class="d">' +
+          run.rumors.map((r) => '«' + r.text + '»').join('<br>') +
+          '</div>'
+        : '');
   }
 
   bind(): void {

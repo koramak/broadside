@@ -1,116 +1,137 @@
-/* Parchment / ink / gold / rust UI language, ported from the prototypes. */
+/* Parchment / ink / gold / rust UI language, ported from the prototypes.
+   FEEL (2026-06-12): all text ~200% — readability over economy of space. */
 :root{--ink:#0b1b22;--parch:#e9dcbe;--parch-dim:#b9ad8e;--rust:#c4583a;--gold:#d9a441}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:var(--ink);font-family:Georgia,'Times New Roman',serif;color:var(--parch)}
 #c{position:fixed;inset:0;display:block;touch-action:none}
-.panel{position:fixed;background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:8px 10px}
-.lbl{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--parch-dim);font-family:'Courier New',monospace}
-.shipname{font-size:13px;letter-spacing:.06em;margin-bottom:4px}
-.bar{width:140px;height:7px;background:rgba(233,220,190,.12);border-radius:3px;margin:3px 0 6px;overflow:hidden}
-.bar i{display:block;height:100%;border-radius:3px;transition:width .15s}
+.panel{position:fixed;background:rgba(11,27,34,.78);border:1px solid rgba(233,220,190,.22);border-radius:8px;padding:10px 14px}
+.lbl{font-size:17px;letter-spacing:.16em;text-transform:uppercase;color:var(--parch-dim);font-family:'Courier New',monospace}
+.shipname{font-size:24px;letter-spacing:.06em;margin-bottom:5px}
+.bar{width:220px;height:12px;background:rgba(233,220,190,.12);border-radius:5px;margin:4px 0 8px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:5px;transition:width .15s}
 .hull i{background:var(--rust)} .sail i{background:var(--parch)} .crew i{background:var(--gold)}
-.sub{font-size:9px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.08em}
+.sub{font-size:16px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.06em}
 #pstat{top:12px;left:12px;z-index:5}
-#fleet{bottom:96px;left:12px;display:flex;flex-direction:column;gap:6px;background:none;border:none;padding:0;position:fixed;z-index:5}
-.chip{background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;padding:5px 8px;width:168px}
-.chip .nm{font-size:11px}
-.chip .tr{font-size:8px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.06em}
-.chip .bar{width:100%;height:4px;margin:3px 0}
-.chip button{font-size:9px;padding:2px 7px;float:right;margin-top:-2px;font-family:'Courier New',monospace}
+#fleet{bottom:110px;left:12px;display:flex;flex-direction:column;gap:8px;background:none;border:none;padding:0;position:fixed;z-index:5}
+.chip{background:rgba(11,27,34,.78);border:1px solid rgba(233,220,190,.22);border-radius:8px;padding:7px 10px;width:250px}
+.chip .nm{font-size:19px}
+.chip .tr{font-size:13px;font-family:'Courier New',monospace;color:var(--parch-dim);letter-spacing:.05em}
+.chip .bar{width:100%;height:7px;margin:4px 0}
+.chip button{font-size:14px;padding:3px 10px;float:right;margin-top:-2px;font-family:'Courier New',monospace}
 .chip.dead{opacity:.4}
-#estat{top:12px;right:12px;display:flex;flex-direction:column;gap:6px;background:none;border:none;padding:0;align-items:flex-end;position:fixed;z-index:5}
-#estat .chip{width:150px}
-#windbox{top:12px;left:50%;transform:translateX(-50%);text-align:center;padding:6px 14px;z-index:5}
-#rose{width:48px;height:48px;margin:2px auto;position:relative}
+#estat{top:12px;right:12px;display:flex;flex-direction:column;gap:8px;background:none;border:none;padding:0;align-items:flex-end;position:fixed;z-index:5}
+#estat .chip{width:230px}
+#windbox{top:12px;left:50%;transform:translateX(-50%);text-align:center;padding:8px 18px;z-index:5}
+#rose{width:64px;height:64px;margin:3px auto;position:relative}
 #rose svg{position:absolute;inset:0}
-#knots{font-family:'Courier New',monospace;font-size:11px;color:var(--parch-dim)}
-#battleno{font-family:'Courier New',monospace;font-size:9px;color:var(--gold);letter-spacing:.1em}
-#pausebtn{position:fixed;top:14px;left:calc(50% + 62px);width:36px;height:36px;font-size:15px;border-radius:50%;font-family:Georgia,serif;z-index:5}
-button{font-family:'Courier New',monospace;background:rgba(233,220,190,.08);border:1px solid rgba(233,220,190,.3);color:var(--parch);border-radius:6px;cursor:pointer;user-select:none;-webkit-user-select:none}
+#knots{font-family:'Courier New',monospace;font-size:19px;color:var(--parch-dim)}
+#battleno{font-family:'Courier New',monospace;font-size:15px;color:var(--gold);letter-spacing:.08em;max-width:420px}
+#pausebtn{position:fixed;top:14px;left:calc(50% + 130px);width:48px;height:48px;font-size:21px;border-radius:50%;font-family:Georgia,serif;z-index:5}
+button{font-family:'Courier New',monospace;background:rgba(233,220,190,.08);border:1px solid rgba(233,220,190,.3);color:var(--parch);border-radius:7px;cursor:pointer;user-select:none;-webkit-user-select:none}
 button:active{background:rgba(233,220,190,.22)}
 button.on{background:rgba(217,164,65,.25);border-color:var(--gold)}
 button:disabled{opacity:.35;cursor:default}
-#feed{position:fixed;top:112px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.05em;max-width:90vw;z-index:5}
-#feed div{color:var(--gold);text-shadow:0 1px 4px #000;margin-top:3px;transition:opacity .5s}
-#ammo{bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px;position:fixed;background:rgba(11,27,34,.74);border:1px solid rgba(233,220,190,.22);border-radius:6px;z-index:5}
-#ammo button{padding:8px 11px;font-size:11px}
-#ammo .k{font-size:9px;color:var(--parch-dim);display:block}
-#helm{bottom:14px;left:188px;display:flex;gap:8px;align-items:flex-end;padding:8px;z-index:5}
-#helm button{width:54px;height:54px;font-size:20px;font-family:Georgia,serif}
-#sailctl{display:flex;flex-direction:column;gap:4px;align-items:center}
-#sailctl button{width:54px;height:24px;font-size:13px}
-#sailset{font-size:9px;letter-spacing:.1em;font-family:'Courier New',monospace;color:var(--parch-dim)}
-#guns{bottom:14px;right:12px;display:flex;gap:8px;padding:8px;align-items:flex-end;z-index:5}
-.fbtn{width:84px;height:56px;position:relative;overflow:hidden;font-size:11px;letter-spacing:.06em}
+#feed{position:fixed;top:150px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;font-family:'Courier New',monospace;font-size:19px;letter-spacing:.04em;max-width:92vw;z-index:5}
+#feed div{color:var(--gold);text-shadow:0 2px 6px #000;margin-top:5px;transition:opacity .5s}
+#ammo{bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:8px;position:fixed;background:rgba(11,27,34,.78);border:1px solid rgba(233,220,190,.22);border-radius:8px;z-index:5}
+#ammo button{padding:10px 16px;font-size:19px}
+#ammo .k{font-size:14px;color:var(--parch-dim);display:block}
+#helm{bottom:14px;left:200px;display:flex;gap:10px;align-items:flex-end;padding:10px;z-index:5}
+#helm button{width:74px;height:74px;font-size:30px;font-family:Georgia,serif}
+#sailctl{display:flex;flex-direction:column;gap:5px;align-items:center}
+#sailctl button{width:74px;height:32px;font-size:18px}
+#sailset{font-size:14px;letter-spacing:.08em;font-family:'Courier New',monospace;color:var(--parch-dim)}
+#guns{bottom:14px;right:12px;display:flex;gap:10px;padding:10px;align-items:flex-end;z-index:5}
+.fbtn{width:130px;height:76px;position:relative;overflow:hidden;font-size:19px;letter-spacing:.05em}
 .fbtn .cd{position:absolute;left:0;bottom:0;top:0;background:rgba(217,164,65,.18);width:0%}
 .fbtn span{position:relative}
 .fbtn.ready{border-color:var(--gold)}
 .fbtn.aim{background:rgba(196,88,58,.28);border-color:var(--rust)}
-#gunscol{display:flex;flex-direction:column;gap:6px}
-#sigbtn,#orderbtn{width:84px;height:30px;font-size:9px;letter-spacing:.04em}
+#gunscol{display:flex;flex-direction:column;gap:8px}
+#sigbtn,#orderbtn{width:130px;height:42px;font-size:14px;letter-spacing:.03em}
 #sigbtn{border-color:var(--gold)}
-#boardbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
-#dockbtn{position:fixed;bottom:86px;right:12px;padding:11px 16px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
-#boarding{bottom:90px;left:50%;transform:translateX(-50%);width:420px;max-width:94vw;display:none;z-index:6;border-color:var(--gold)}
-#btitle{color:var(--gold);margin-bottom:5px}
-.bsec{display:flex;align-items:center;gap:8px;margin:4px 0}
-.bsec .bn{width:92px;font-size:9px;font-family:'Courier New',monospace;letter-spacing:.08em;color:var(--parch-dim);text-align:right}
-.bsec .bbar{flex:1;height:12px;background:rgba(233,220,190,.1);border-radius:3px;position:relative;overflow:hidden}
+#boardbtn{position:fixed;bottom:108px;right:12px;padding:14px 20px;font-size:21px;letter-spacing:.08em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
+#dockbtn{position:fixed;bottom:108px;right:12px;padding:14px 20px;font-size:21px;letter-spacing:.08em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
+#boarding{bottom:104px;left:50%;transform:translateX(-50%);width:600px;max-width:96vw;display:none;z-index:6;border-color:var(--gold)}
+#btitle{color:var(--gold);margin-bottom:7px}
+.bsec{display:flex;align-items:center;gap:10px;margin:6px 0}
+.bsec .bn{width:140px;font-size:14px;font-family:'Courier New',monospace;letter-spacing:.07em;color:var(--parch-dim);text-align:right}
+.bsec .bbar{flex:1;height:18px;background:rgba(233,220,190,.1);border-radius:4px;position:relative;overflow:hidden}
 .bsec .bp{position:absolute;left:0;top:0;bottom:0;background:var(--gold);opacity:.85}
 .bsec .be{position:absolute;right:0;top:0;bottom:0;background:var(--rust);opacity:.85}
-.bsec .bnum{width:64px;font-size:9px;font-family:'Courier New',monospace;color:var(--parch)}
-.bsec button{font-size:9px;padding:3px 7px}
-#bfoot{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
-#bbtns{display:flex;gap:6px}
-#bbtns button{font-size:9px;padding:4px 9px}
+.bsec .bnum{width:96px;font-size:14px;font-family:'Courier New',monospace;color:var(--parch)}
+.bsec button{font-size:14px;padding:5px 10px}
+#bfoot{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+#bbtns{display:flex;gap:8px}
+#bbtns button{font-size:14px;padding:6px 13px}
 #bbtns button.on{background:rgba(196,88,58,.3);border-color:var(--rust)}
-#cargo{bottom:96px;left:12px;display:none;z-index:5;min-width:170px}
-#cargo .sub{line-height:1.7}
-#rep{top:208px;left:12px;display:none;z-index:5;min-width:170px}
-#rep .sub{line-height:1.7}
+#cargo{bottom:110px;left:12px;display:none;z-index:5;min-width:260px;max-width:340px}
+#cargo .sub{line-height:1.6}
+.rumorhead{color:var(--gold);letter-spacing:.1em;font-size:13px}
+#rep{top:230px;left:12px;display:none;z-index:5;min-width:260px}
+#rep .sub{line-height:1.6}
 #minimap{bottom:14px;right:12px;display:none;z-index:5}
-#minimap canvas{display:block;margin-top:4px;background:rgba(11,27,34,.5);border:1px solid rgba(233,220,190,.14);border-radius:4px}
-#port{position:fixed;inset:0;background:rgba(7,16,20,.93);display:none;align-items:center;justify-content:flex-start;flex-direction:column;gap:11px;text-align:center;padding:26px 16px;z-index:20;overflow-y:auto}
-#port h1{font-size:26px;font-weight:normal;letter-spacing:.12em}
-#pmeta{font-family:'Courier New',monospace;font-size:11px;color:var(--parch-dim)}
-#pstores2{font-family:'Courier New',monospace;font-size:12px;color:var(--gold)}
-#port .big{padding:11px 24px;font-size:13px;letter-spacing:.1em;border-color:var(--gold);background:rgba(217,164,65,.18)}
-.hcard.wide{width:472px;max-width:92vw}
-.mrow{display:flex;align-items:center;gap:6px;font-family:'Courier New',monospace;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(233,220,190,.08)}
-.mrow .mname{width:74px;text-align:left}
-.mrow .mprice{width:46px;color:var(--gold);text-align:right}
-.mrow .mqty{width:58px;color:var(--parch-dim);text-align:right}
-.mrow button{font-size:9px;padding:3px 7px;margin:0;width:auto;display:inline-block}
-#hint{bottom:84px;left:50%;transform:translateX(-50%);font-size:10px;font-family:'Courier New',monospace;color:var(--parch-dim);background:none;border:none;text-align:center;position:fixed;z-index:5}
-#overlay,#pausemenu,#harbor{position:fixed;inset:0;background:rgba(7,16,20,.92);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;text-align:center;padding:16px;z-index:20;overflow-y:auto}
-#overlay h1,#pausemenu h1,#harbor h1{font-size:26px;font-weight:normal;letter-spacing:.12em}
-#overlay p{max-width:440px;color:var(--parch-dim);font-size:14px;line-height:1.5}
-#overlay button,#pausemenu .big,#harbor .big{padding:11px 24px;font-size:13px;letter-spacing:.1em}
-#runstats{font-family:'Courier New',monospace;font-size:11px;color:var(--gold)}
-#pausemenu .keys{font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim);line-height:1.7;max-width:400px}
-#dials{display:flex;flex-direction:column;gap:6px;align-items:center;margin:4px 0}
-.drow{display:flex;gap:6px;align-items:center;font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim)}
-.drow span{width:96px;text-align:right;letter-spacing:.08em}
-.drow button{font-size:10px;padding:4px 10px}
+#minimap canvas{display:block;margin-top:5px;background:rgba(11,27,34,.5);border:1px solid rgba(233,220,190,.14);border-radius:4px}
+#port{position:fixed;inset:0;background:rgba(7,16,20,.93);display:none;align-items:center;justify-content:flex-start;flex-direction:column;gap:13px;text-align:center;padding:30px 16px;z-index:20;overflow-y:auto}
+#port h1{font-size:42px;font-weight:normal;letter-spacing:.12em}
+#pmeta{font-family:'Courier New',monospace;font-size:18px;color:var(--parch-dim)}
+#pstores2{font-family:'Courier New',monospace;font-size:20px;color:var(--gold)}
+#port .big{padding:14px 30px;font-size:21px;letter-spacing:.08em;border-color:var(--gold);background:rgba(217,164,65,.18)}
+.hcard.wide{width:660px;max-width:94vw}
+.mrow{display:flex;align-items:center;gap:8px;font-family:'Courier New',monospace;font-size:17px;padding:5px 0;border-bottom:1px solid rgba(233,220,190,.08)}
+.mrow .mname{width:104px;text-align:left}
+.mrow .mprice{width:64px;color:var(--gold);text-align:right}
+.mrow .mqty{width:88px;color:var(--parch-dim);text-align:right}
+.mrow button{font-size:14px;padding:5px 10px;margin:0;width:auto;display:inline-block}
+#hint{bottom:100px;left:50%;transform:translateX(-50%);font-size:15px;font-family:'Courier New',monospace;color:var(--parch-dim);background:none;border:none;text-align:center;position:fixed;z-index:5}
+#overlay,#pausemenu,#harbor{position:fixed;inset:0;background:rgba(7,16,20,.92);display:none;align-items:center;justify-content:center;flex-direction:column;gap:13px;text-align:center;padding:16px;z-index:20;overflow-y:auto}
+#overlay h1,#pausemenu h1,#harbor h1{font-size:42px;font-weight:normal;letter-spacing:.12em}
+#overlay p{max-width:640px;color:var(--parch-dim);font-size:21px;line-height:1.5}
+#overlay button,#pausemenu .big,#harbor .big{padding:14px 30px;font-size:21px;letter-spacing:.08em}
+#runstats{font-family:'Courier New',monospace;font-size:18px;color:var(--gold)}
+#pausemenu .keys{font-family:'Courier New',monospace;font-size:16px;color:var(--parch-dim);line-height:1.7;max-width:620px}
+#dials{display:flex;flex-direction:column;gap:8px;align-items:center;margin:5px 0}
+.drow{display:flex;gap:8px;align-items:center;font-family:'Courier New',monospace;font-size:16px;color:var(--parch-dim)}
+.drow span{width:170px;text-align:right;letter-spacing:.07em}
+.drow button{font-size:16px;padding:6px 14px}
 /* harbor */
 #harbor{justify-content:flex-start;padding-top:36px}
-.hrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:760px}
-.hcard{background:rgba(11,27,34,.85);border:1px solid rgba(233,220,190,.25);border-radius:8px;padding:10px 12px;width:225px;text-align:left}
-.hcard h3{font-size:12px;font-weight:normal;letter-spacing:.1em;margin-bottom:4px}
-.hcard .d{font-size:10px;font-family:'Courier New',monospace;color:var(--parch-dim);line-height:1.6;margin-bottom:6px}
-.hcard button{display:block;width:100%;margin-top:4px;padding:7px;font-size:10px;text-align:left}
-#hstores{font-family:'Courier New',monospace;font-size:12px;color:var(--gold)}
+.hrow{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:1100px}
+.hcard{background:rgba(11,27,34,.85);border:1px solid rgba(233,220,190,.25);border-radius:10px;padding:13px 16px;width:330px;text-align:left}
+.hcard h3{font-size:19px;font-weight:normal;letter-spacing:.09em;margin-bottom:5px}
+.hcard .d{font-size:16px;font-family:'Courier New',monospace;color:var(--parch-dim);line-height:1.6;margin-bottom:8px}
+.hcard button{display:block;width:100%;margin-top:6px;padding:10px;font-size:15px;text-align:left}
+#hstores{font-family:'Courier New',monospace;font-size:20px;color:var(--gold)}
 #hnext{border-color:var(--gold);background:rgba(217,164,65,.18)}
+@media (max-width:980px){
+  .lbl{font-size:13px} .shipname{font-size:18px} .sub{font-size:12px}
+  .bar{width:150px;height:9px}
+  .chip{width:180px} .chip .nm{font-size:14px} .chip .tr{font-size:10px}
+  #estat .chip{width:170px}
+  #knots{font-size:14px} #battleno{font-size:11px;max-width:300px}
+  #feed{font-size:14px;top:130px}
+  #ammo button{padding:8px 11px;font-size:14px} #ammo .k{font-size:10px}
+  #helm button{width:58px;height:58px;font-size:22px}
+  #sailctl button{width:58px;height:26px;font-size:14px} #sailset{font-size:10px}
+  .fbtn{width:96px;height:60px;font-size:14px}
+  #sigbtn,#orderbtn{width:96px;height:34px;font-size:11px}
+  #boardbtn,#dockbtn{font-size:15px;padding:11px 15px}
+  #cargo{min-width:200px;max-width:240px} #rep{min-width:200px}
+  .hcard{width:300px} #port h1,#overlay h1,#pausemenu h1,#harbor h1{font-size:30px}
+}
 @media (max-width:760px){
-  .bar{width:100px} #hint{display:none}
-  #helm{left:12px;bottom:170px} #fleet{bottom:auto;top:150px}
-  .chip{width:140px} #ammo{bottom:90px}
-  #boardbtn{bottom:230px} #dockbtn{bottom:230px} #feed{top:124px;font-size:10px}
-  .hcard{width:86vw}
-  #cargo{bottom:auto;top:150px;min-width:130px;font-size:9px}
-  #rep{top:260px;min-width:130px}
-  #boarding{bottom:160px;width:94vw}
-  .bsec .bn{width:64px}
-  .hcard.wide{width:94vw}
-  .mrow{flex-wrap:wrap}
+  .bar{width:110px} #hint{display:none}
+  #helm{left:12px;bottom:190px} #fleet{bottom:auto;top:170px}
+  .chip{width:150px} #ammo{bottom:104px}
+  #boardbtn{bottom:260px} #dockbtn{bottom:260px} #feed{top:140px;font-size:12px}
+  .hcard{width:88vw}
+  #cargo{bottom:auto;top:170px;min-width:150px;max-width:170px}
+  #cargo .sub{font-size:10px}
+  #rep{top:300px;min-width:150px}
+  #boarding{bottom:180px;width:96vw}
+  .bsec .bn{width:80px;font-size:10px} .bsec .bnum{width:64px;font-size:10px}
+  .hcard.wide{width:96vw}
+  .mrow{flex-wrap:wrap;font-size:13px}
+  #minimap canvas{width:150px!important;height:106px!important}
+  #pausemenu .keys{font-size:12px} .drow{font-size:12px} .drow span{width:120px}
 }

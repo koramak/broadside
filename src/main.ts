@@ -6,7 +6,7 @@ import './ui/ui.css';
 import { Battle } from './sim/battle';
 import type { BattleSpec } from './sim/battle';
 import { SIM_DT } from './sim/constants';
-import { newRun } from './sim/run';
+import { newRun, topUpCrew } from './sim/run';
 import { clampCargo } from './sim/economy';
 import { Rng } from './sim/rng';
 import type { RunState } from './sim/types';
@@ -22,8 +22,10 @@ import { HarborScreen } from './ui/harbor';
 import { PortScreen } from './ui/port';
 import { Input } from './input/input';
 import { Minimap } from './ui/minimap';
-import { audio, boom } from './audio';
+import { audio, boom, setMusic } from './audio';
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
+import { refreshRumors } from './sim/economy';
+import { PORTS } from './sim/worldgen';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const shell = new SceneShell(canvas);
@@ -244,7 +246,18 @@ portScreen.onShipChanged = () => {
 
 function enterPort(port: NonNullable<World['canDock']>): void {
   mode = 'port';
-  if (world) onDocked(run, port.id, world.events);
+  if (world) {
+    onDocked(run, port.id, world.events);
+    // the tavern talks the moment you tie up
+    refreshRumors(run, PORTS, port.id, world.day);
+    // pool hands walk aboard free — replenishing crew at port is automatic
+    const before = run.pool;
+    if (topUpCrew(run)) {
+      const joined = before - run.pool;
+      if (joined > 0) world.events.feed(joined + ' hands from your pool walk aboard — muster made good');
+      world.syncPlayerFromRun(run);
+    }
+  }
   portScreen.show(port, run, world ? world.day : 0);
 }
 
@@ -265,6 +278,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-dial]').forEach((b) => {
     if (dial === 'reload') TUNING.reloadBase = Number(v);
     if (dial === 'rake') setRake(v as 'full' | 'reduced');
     if (dial === 'easy') EASY.on = v === 'on';
+    if (dial === 'music') setMusic(v === 'on');
     document
       .querySelectorAll<HTMLButtonElement>(`[data-dial="${dial}"]`)
       .forEach((x) => x.classList.toggle('on', x === b));

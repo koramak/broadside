@@ -41,6 +41,54 @@ export function priceAt(bias: Record<GoodKey, number>, good: GoodDef, day: numbe
   return Math.max(2, Math.round(good.base * bias[good.key] * (1 + w)));
 }
 
+/* ============ rumors: tavern intelligence that's actually true ============ */
+
+const RUMOR_SHAPES = [
+  (g: string, p: string, n: number) => `${p} pays ${n} for ${g.toLowerCase()} — a wedding, a funeral, don’t ask.`,
+  (g: string, p: string, n: number) => `They’re short of ${g.toLowerCase()} at ${p}. ${n} a cask and no questions.`,
+  (g: string, p: string, n: number) => `A clerk at ${p} writes ${n} against ${g.toLowerCase()} and weeps doing it.`,
+  (g: string, p: string, n: number) => `${g} fetches ${n} at ${p}, if you can get there before everyone in this room.`,
+];
+
+export interface PortLike {
+  id: string;
+  name: string;
+  bias: Record<GoodKey, number>;
+}
+
+/** Refresh the run's rumor sheet at a tavern: real high prices elsewhere,
+ *  phrased like gossip. Keeps up to 3 live tips, 12-day shelf life. */
+export function refreshRumors(
+  run: RunState,
+  ports: readonly PortLike[],
+  herePortId: string,
+  day: number,
+): void {
+  run.rumors = run.rumors.filter((r) => day - r.day < 12 && r.portId !== herePortId);
+  // best spreads vs base, excluding the port you're standing in
+  const tips: { score: number; good: GoodDef; port: PortLike; price: number }[] = [];
+  ports.forEach((p, idx) => {
+    if (p.id === herePortId) return;
+    for (const g of GOODS) {
+      const price = priceAt(p.bias, g, day + 2, idx);
+      const score = price / g.base;
+      if (score > 1.25) tips.push({ score, good: g, port: p, price });
+    }
+  });
+  tips.sort((a, b) => b.score - a.score);
+  for (const t of tips) {
+    if (run.rumors.length >= 3) break;
+    if (run.rumors.some((r) => r.good === t.good.key && r.portId === t.port.id)) continue;
+    const shape = RUMOR_SHAPES[(t.good.base + t.port.name.length + day) % RUMOR_SHAPES.length];
+    run.rumors.push({
+      text: shape(t.good.name, t.port.name, t.price),
+      good: t.good.key,
+      portId: t.port.id,
+      day,
+    });
+  }
+}
+
 /** Jettison overflow when the fleet shrinks. Returns units lost. */
 export function clampCargo(run: RunState): number {
   let over = cargoLoad(run) - fleetCargoCap(run);

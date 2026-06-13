@@ -67,6 +67,14 @@ export class Minimap {
       g.fill();
     }
 
+    // your consorts — gold like everything that's yours
+    g.fillStyle = 'rgba(217,164,65,.9)';
+    for (const s of world.consorts) {
+      g.beginPath();
+      g.arc(this.sx(s.x), this.sy(s.y), 1.6, 0, Math.PI * 2);
+      g.fill();
+    }
+
     // current objective — pulsing gold ring
     const obj = currentObjective(run);
     if (obj) {

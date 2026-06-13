@@ -13,9 +13,12 @@ import { TAU } from '../sim/math';
 export class WorldView {
   group = new THREE.Group();
   private contactViews = new Map<number, ShipView>();
+  private consortViews: ShipView[] = [];
   private crateMeshes = new Map<number, THREE.Group>();
   private marker: THREE.Group;
   private markerRing: THREE.Mesh;
+  private markerLabel: THREE.Sprite;
+  private markerLabelKind = '';
   private mist: THREE.Mesh;
   private mistMat: THREE.MeshBasicMaterial;
 
@@ -82,6 +85,13 @@ export class WorldView {
     const pennant = lib.instantiateProp('flag-high-pennant', 30);
     pennant.position.y = 4;
     this.marker.add(pennant);
+    // floating label so nobody has to ask what the gold circle is
+    this.markerLabel = new THREE.Sprite(
+      new THREE.SpriteMaterial({ transparent: true, depthWrite: false }),
+    );
+    this.markerLabel.position.y = 150;
+    this.markerLabel.scale.set(360, 90, 1);
+    this.marker.add(this.markerLabel);
     this.group.add(this.marker);
 
     // the Mist: a tall pale wall along x = mistX
@@ -98,6 +108,33 @@ export class WorldView {
     this.group.add(this.mist);
   }
 
+  /** Paint the marker label text onto a canvas sprite (cached per kind). */
+  private setMarkerLabel(kind: 'fight' | 'port'): void {
+    if (this.markerLabelKind === kind) return;
+    this.markerLabelKind = kind;
+    const text = kind === 'fight' ? '⚔ NEXT ACTION — SAIL IN' : '⚓ MAKE PORT HERE';
+    const cv = document.createElement('canvas');
+    cv.width = 512;
+    cv.height = 128;
+    const g = cv.getContext('2d')!;
+    g.fillStyle = 'rgba(11,27,34,0.78)';
+    g.strokeStyle = 'rgba(217,164,65,0.9)';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.roundRect(8, 18, 496, 92, 14);
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#d9a441';
+    g.font = '600 44px Georgia, serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, 256, 66);
+    const mat = this.markerLabel.material as THREE.SpriteMaterial;
+    mat.map?.dispose();
+    mat.map = new THREE.CanvasTexture(cv);
+    mat.needsUpdate = true;
+  }
+
   update(world: World, run: RunState, time: number): void {
     // gold marker follows the current objective — a fight mark or a port call
     const obj = currentObjective(run);
@@ -105,12 +142,28 @@ export class WorldView {
       const m = objectivePos(obj);
       this.marker.visible = true;
       this.marker.position.set(m.x, 0, m.y);
+      this.setMarkerLabel(obj.kind);
       const pulse = 1 + Math.sin(time * 2.4) * 0.06;
       this.markerRing.scale.setScalar(pulse);
       (this.markerRing.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.2 * Math.sin(time * 2.4);
     } else {
       this.marker.visible = false;
     }
+
+    // the armada on the chart, holding station off your quarters
+    while (this.consortViews.length > world.consorts.length) {
+      this.consortViews.pop()!.dispose(this.scene);
+    }
+    world.consorts.forEach((s, i) => {
+      let v = this.consortViews[i];
+      if (!v || v.ship !== s) {
+        if (v) v.dispose(this.scene);
+        v = new ShipView(s, this.lib);
+        this.scene.add(v.group);
+        this.consortViews[i] = v;
+      }
+      v.update(false, time);
+    });
 
     // once the Plate Ship falls, the wall thins to a suggestion
     const mistOpen = run.battle > 6;
@@ -164,6 +217,7 @@ export class WorldView {
   setVisible(v: boolean): void {
     this.group.visible = v;
     for (const [, view] of this.contactViews) view.group.visible = v;
+    for (const view of this.consortViews) view.group.visible = v;
     for (const [, m] of this.crateMeshes) m.visible = v;
   }
 
@@ -171,6 +225,8 @@ export class WorldView {
   clearDynamic(): void {
     for (const [, v] of this.contactViews) v.dispose(this.scene);
     this.contactViews.clear();
+    for (const v of this.consortViews) v.dispose(this.scene);
+    this.consortViews = [];
     for (const [, m] of this.crateMeshes) this.scene.remove(m);
     this.crateMeshes.clear();
   }

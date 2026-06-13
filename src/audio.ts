@@ -1,7 +1,42 @@
-// Procedural audio: the prototype's boom() synth plus a quiet sea-wash bed.
+// Procedural audio: the prototype's boom() synth plus a quiet sea-wash bed,
+// and a small tavern-band music player (CC-BY tracks, see ASSETS.md).
 
 let AC: AudioContext | null = null;
 let ambientOn = false;
+
+const TRACKS = [
+  'assets/music/folk-round.mp3',
+  'assets/music/master-of-the-feast.mp3',
+];
+let musicEl: HTMLAudioElement | null = null;
+let musicIdx = 0;
+let musicWanted = true;
+
+/** MUSIC dial in the pause menu. */
+export function setMusic(on: boolean): void {
+  musicWanted = on;
+  if (!on && musicEl) musicEl.pause();
+  if (on && musicEl) void musicEl.play().catch(() => {});
+  if (on && !musicEl) startMusic();
+}
+
+function startMusic(): void {
+  if (musicEl || !musicWanted) return;
+  musicEl = new Audio();
+  musicEl.volume = 0.22;
+  musicEl.src = TRACKS[musicIdx];
+  musicEl.addEventListener('ended', () => {
+    musicIdx = (musicIdx + 1) % TRACKS.length;
+    if (musicEl && musicWanted) {
+      musicEl.src = TRACKS[musicIdx];
+      void musicEl.play().catch(() => {});
+    }
+  });
+  void musicEl.play().catch(() => {
+    // autoplay refused — the next user gesture will retry via audio()
+    musicEl = null;
+  });
+}
 
 export function audio(): void {
   if (!AC) {
@@ -16,6 +51,7 @@ export function audio(): void {
     ambientOn = true;
     startAmbient(AC);
   }
+  startMusic();
 }
 
 /** Endless filtered-noise wash with a slow swell — the model sea, humming. */

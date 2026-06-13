@@ -27,6 +27,12 @@ export interface Contact {
   wpX: number;
   wpY: number;
   gone: boolean;
+  /** seconds the quarry has stayed out of reach — hunters get bored */
+  coldT?: number;
+  /** after giving up, how long before this one will hunt again */
+  huntCooldown?: number;
+  /** one-shot flag so boundary refusals only feed once */
+  brokeOff?: boolean;
 }
 
 export interface Crate {
@@ -80,6 +86,8 @@ export class World {
   canDock: PortDef | null = null;
   pendingEncounter: EncounterSpec | null = null;
   private carpenterBusy = false;
+  /** your armada, sailing the chart with you (cosmetic escorts in map mode) */
+  consorts: Ship[] = [];
 
   constructor(run: RunState, seed: number) {
     this.rng = new Rng(seed);
@@ -90,6 +98,24 @@ export class World {
     this.syncPlayerFromRun(run);
     // a few crates seeded around the world
     for (let i = 0; i < 10; i++) this.spawnCrate();
+  }
+
+  /** Rebuild chart escorts when the armada roster changes. */
+  private syncConsorts(run: RunState): void {
+    const want = run.armada;
+    if (this.consorts.length === want.length && this.consorts.every((s, i) => s.cls === want[i].cls)) return;
+    const p = this.player;
+    this.consorts = want.map((a, i) => {
+      const s = makeShip(
+        a.cls, 'p',
+        p.x - Math.cos(p.heading) * 150 * (i + 1),
+        p.y - Math.sin(p.heading) * 150 * (i + 1),
+        p.heading,
+      );
+      s.name = a.name;
+      s.speed = p.speed;
+      return s;
+    });
   }
 
   /** Map-ship condition mirrors the persistent flagship. */
@@ -167,25 +193,54 @@ export class World {
     }
   }
 
+  /** Jurisdiction: mortal hunters stop at the Mist; the Drowned never leave it. */
+  private huntAllowed(c: Contact): boolean {
+    if (c.spec.ghost) return this.player.x > WORLD.mistX - 150;
+    return this.player.x < WORLD.mistX - 150;
+  }
+
   private steerContact(c: Contact, dt: number): void {
     const s = c.ship;
     const toPlayer = dist(s, this.player);
     let tx = c.wpX;
     let ty = c.wpY;
+    if (c.huntCooldown && c.huntCooldown > 0) c.huntCooldown -= dt;
+    const hunting =
+      c.spec.behavior === 'hunt' && toPlayer < 1500 && (c.huntCooldown ?? 0) <= 0 && this.huntAllowed(c);
     if (c.spec.behavior === 'flee' && toPlayer < 700) {
       tx = s.x + (s.x - this.player.x);
       ty = s.y + (s.y - this.player.y);
-    } else if (c.spec.behavior === 'hunt' && toPlayer < 1500) {
+    } else if (hunting) {
       tx = this.player.x;
       ty = this.player.y;
-    } else if (dist(s, { x: c.wpX, y: c.wpY }) < 250) {
-      this.pickWaypoint(c);
+      c.brokeOff = false;
+      // bored hunters: quarry out of reach too long → give up the chase
+      c.coldT = toPlayer > 900 ? (c.coldT ?? 0) + dt : 0;
+      if (c.coldT > 20) {
+        c.coldT = 0;
+        c.huntCooldown = 60;
+        this.pickWaypoint(c);
+        if (toPlayer < 1300) this.events.feed(s.name + ' tires of the chase and bears away');
+      }
+    } else {
+      if (c.spec.behavior === 'hunt' && toPlayer < 900 && !this.huntAllowed(c) && !c.brokeOff) {
+        c.brokeOff = true;
+        this.events.feed(
+          c.spec.ghost
+            ? 'It stops at the edge of the white, watching. It will not come out.'
+            : s.name + ' hauls her wind at the mist line — no flag’s writ runs in there',
+        );
+      }
+      if (dist(s, { x: c.wpX, y: c.wpY }) < 250) this.pickWaypoint(c);
     }
     const want = Math.atan2(ty - s.y, tx - s.x);
     const err = normAng(want - s.heading);
     s.rudder = Math.abs(err) < 0.07 ? 0 : err > 0 ? 1 : -1;
     s.sailIdx = 2;
     stepShipPhysics(s, this.wind.dir, dt);
+    // jurisdiction is physical, not polite: mortals stop short, ghosts stay in
+    if (c.spec.ghost) s.x = Math.max(s.x, WORLD.mistX + 60);
+    else s.x = Math.min(s.x, WORLD.mistX - 80);
     this.collideIslands(s);
   }
 
@@ -241,18 +296,44 @@ export class World {
     const p = this.player;
     p.rudder = this.playerRudder;
     stepShipPhysics(p, this.wind.dir, dt);
-    // the carpenter's crew fothers the worst leaks while you sail (testing
-    // mercy, EASY-gated): free patching, but never above carpenterCap
-    if (EASY.on && run.flag.hullPct < EASY.carpenterCap) {
+    // the carpenter's crew fothers the worst leaks while you sail. Chain
+    // pumps (chandler gear) raise the ceiling and work even without mercy.
+    const carpCap = run.gear.pumps ? 0.5 : EASY.carpenterCap;
+    if ((EASY.on || run.gear.pumps) && run.flag.hullPct < carpCap) {
       if (!this.carpenterBusy) {
         this.carpenterBusy = true;
         this.events.feed('The carpenter takes a crew below — she’ll float to port, captain');
       }
-      run.flag.hullPct = Math.min(EASY.carpenterCap, run.flag.hullPct + EASY.carpenterRate * dt);
+      run.flag.hullPct = Math.min(carpCap, run.flag.hullPct + EASY.carpenterRate * dt);
       this.player.hull = Math.max(8, Math.round(this.player.maxHull * run.flag.hullPct));
-    } else if (this.carpenterBusy && run.flag.hullPct >= EASY.carpenterCap) {
+    } else if (this.carpenterBusy && run.flag.hullPct >= carpCap) {
       this.carpenterBusy = false;
     }
+
+    // the armada keeps station off your quarters — the fleet sails as one
+    this.syncConsorts(run);
+    this.consorts.forEach((s, i) => {
+      const back = normAng(p.heading + Math.PI);
+      const perp = normAng(p.heading + Math.PI / 2);
+      const row = Math.floor(i / 2) + 1;
+      const side = (i % 2 ? 1 : -1) * 95;
+      const txp = p.x + Math.cos(back) * 150 * row + Math.cos(perp) * side;
+      const typ = p.y + Math.sin(back) * 150 * row + Math.sin(perp) * side;
+      const d = Math.hypot(txp - s.x, typ - s.y);
+      if (d > 1400) {
+        // fell hopelessly behind (battle exits, docking) — close up the line
+        s.x = txp;
+        s.y = typ;
+        s.heading = p.heading;
+        s.speed = p.speed;
+      }
+      const want = Math.atan2(typ - s.y, txp - s.x);
+      const err = normAng(want - s.heading);
+      s.rudder = Math.abs(err) < 0.08 ? 0 : err > 0 ? 1 : -1;
+      s.sailIdx = d > 200 ? 2 : d > 60 ? this.player.sailIdx : Math.max(0, this.player.sailIdx - 1);
+      stepShipPhysics(s, this.wind.dir, dt);
+      this.collideIslands(s);
+    });
     this.collideIslands(p);
     // world bounds + the Mist
     const hw = WORLD.width / 2;
