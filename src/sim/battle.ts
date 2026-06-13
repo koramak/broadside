@@ -16,6 +16,7 @@ import type {
   Ball, BattlePhase, PendingFire, Ship, Team, Wind,
 } from './types';
 import * as boarding from './boarding';
+import { BOARD_CFG } from './boardingConfig';
 import type { BoardingState } from './boarding';
 import type { RunState } from './types';
 import { flagStats, topUpCrew } from './run';
@@ -109,7 +110,8 @@ export class Battle {
     ];
     flag.name = CLASSES[run.flag.cls].name + ' Persistence';
     flag.captain = ['You', 'bulldog'];
-    this.gearSwivels = run.gear.swivels;
+    this.refitGuns = run.up.guns;
+    this.refitTimbers = run.up.timbers;
     this.ships.push(flag);
     this.ctrl = 0;
 
@@ -310,6 +312,7 @@ export class Battle {
       this.volleyRakeLogged.add(b.vid);
       this.events.feed('Raking fire down the deck of ' + tgt.name + '!');
     }
+    if (rake && tgt.team === 'e') this.lastEnemyRakeAt = this.simClock;
     // ghosts: round shot breaks the bones fine, but canvas-shredders and
     // man-killers find nothing much to bite
     const ghostSail = tgt.ghost ? 0.5 : 1;
@@ -503,12 +506,13 @@ export class Battle {
   }
 
   /** Why boarding is/isn't available right now — drives button + feedback. */
-  boardCheck(): { ok: boolean; reason: 'none' | 'ghost' | 'far' | 'fast'; foe: Ship | null } {
+  boardCheck(): { ok: boolean; reason: 'none' | 'ghost' | 'far' | 'fast' | 'cooldown'; foe: Ship | null } {
     const s = this.P();
     const foe = this.nearestEnemy(s);
     if (this.phase !== 'sail' || s.sinking > 0) return { ok: false, reason: 'none', foe: null };
     if (!foe) return { ok: false, reason: 'none', foe: null };
     if (foe.ghost) return { ok: false, reason: 'ghost', foe };
+    if (this.simClock < this.regrappleUntil) return { ok: false, reason: 'cooldown', foe };
     const d = dist(s, foe);
     if (d >= Battle.boardRange()) return { ok: false, reason: 'far', foe };
     const rv = Math.hypot(
@@ -526,8 +530,13 @@ export class Battle {
 
   private boardNagAt = -9;
   private simClock = 0;
-  /** chandler swivel guns, snapshotted at battle start */
-  private gearSwivels = false;
+  /** naval-state hooks for boarding, snapshotted at battle start */
+  private refitGuns = 0;
+  private refitTimbers = 0;
+  /** when the enemy last ate a raking volley (cadence hook) */
+  private lastEnemyRakeAt = -999;
+  /** after a cut-away or stranding, the grapples need re-rigging */
+  private regrappleUntil = -999;
 
   startBoarding(): void {
     const c = this.boardCheck();
@@ -544,46 +553,65 @@ export class Battle {
     }
     const foe = c.foe!;
     this.phase = 'board';
-    this.board = boarding.startBoarding(this.P(), foe, this.gearSwivels);
+    // the fight before the grapple decides the kitchen
+    this.board = boarding.startBoarding(this.P(), foe, {
+      gauge: this.P().gauge,
+      rakedRecently: this.simClock - this.lastEnemyRakeAt < BOARD_CFG.rakeWindowS,
+      secondSwivel: this.refitGuns >= 1,
+      toughLines: this.refitTimbers >= 1,
+      surgeonsMate: false, // crew-quality refit hook — not yet purchasable
+    });
+    // lash her alongside for the deck fight
+    const me = this.P();
+    const perp = normAng(me.heading + Math.PI / 2);
+    const gap = (me.beam + foe.beam) * 1.1;
+    foe.x = me.x + Math.cos(perp) * gap;
+    foe.y = me.y + Math.sin(perp) * gap;
+    foe.heading = me.heading;
     this.events.feed('GRAPPLES AWAY — boarding ' + foe.name);
-    this.events.feed('1/2/3 send hands · Q swivel · G press the attack');
+    this.events.feed('Tap a station to arm it. Tap again in the GOLD to make it count.');
     this.events.boom(0.4, 0.5, 180);
   }
 
-  /** boarding commands, forwarded from input while the deck fight runs */
-  boardSend(section: number): void {
-    if (this.board) boarding.sendHands(this.board, section);
-  }
-
-  boardSwivel(): void {
-    if (this.board && boarding.fireSwivel(this.board)) {
-      this.events.feed('Swivel gun loaded — it will speak in a moment');
+  /** the whole boarding interface: tap a station */
+  boardTap(id: boarding.StationId): void {
+    if (this.board && this.phase === 'board') {
+      boarding.tap(this.board, id, this.rng, this.events);
     }
   }
 
-  boardPress(): void {
-    if (this.board) {
-      boarding.togglePress(this.board);
-      this.events.feed(this.board.press ? 'PRESS THE ATTACK — no quarter asked' : 'Hold and bleed them — steady now');
-    }
+  /** keyboard convenience: tap the nth visible station (0-indexed) */
+  boardTapIndex(n: number): void {
+    const st = this.board?.stations[n];
+    if (st) this.boardTap(st.id);
   }
 
   private updateBoarding(dt: number, run: RunState): void {
     const board = this.board!;
-    this.P().speed *= 0.95;
-    board.foe.speed *= 0.95;
-    boarding.stepBoarding(board, dt, this.rng, this.events, this.P().name, this.P().maxCrew);
-    if (board.done) {
-      const me = this.P();
-      me.crew = boarding.totalP(board);
-      const remnant = boarding.totalE(board);
-      if (board.done === 'taken') {
-        board.foe.struck = true;
-        // the ones who broke and ran took the better deal: your shilling.
-        // Overwhelm them fast and most of her people live to row for you.
-        const surrendered = Math.round(remnant * 0.5);
-        const captured = Math.round(board.fled) + surrendered;
-        board.foe.crew = remnant - surrendered;
+    const me = this.P();
+    const foe = board.foe;
+    me.speed *= 0.92;
+    foe.speed *= 0.92;
+    // lashed hulls drift as one
+    const perp = normAng(me.heading + Math.PI / 2);
+    const gap = (me.beam + foe.beam) * 1.1;
+    foe.x = me.x + Math.cos(perp) * gap;
+    foe.y = me.y + Math.sin(perp) * gap;
+    foe.heading = me.heading;
+
+    boarding.stepBoarding(board, dt, this.rng, this.events);
+    if (!board.done) return;
+
+    const myRemain = Math.round(board.myHands);
+    const theirRemain = Math.round(board.theirHands);
+    switch (board.done) {
+      case 'taken': {
+        foe.struck = true;
+        // those who broke and ran took the better deal: your shilling
+        const surrendered = Math.round(theirRemain * 0.5);
+        const captured = surrendered + Math.round(board.wounded.length * 0.5);
+        foe.crew = Math.max(0, theirRemain - surrendered);
+        me.crew = myRemain + board.reserve + board.skeleton;
         if (captured > 0) {
           const room = Math.max(0, Math.round(me.maxCrew - me.crew));
           const aboard = Math.min(captured, room);
@@ -594,13 +622,31 @@ export class Battle {
             (aboard > 0 ? ' — ' + aboard + ' fill your own thin ranks' : ''),
           );
         }
-      } else {
-        board.foe.crew = remnant;
-        me.struck = true;
+        break;
       }
-      this.board = null;
-      this.phase = 'sail';
+      case 'repelled': {
+        me.crew = myRemain + board.skeleton; // reserve died covering the retreat
+        foe.crew = theirRemain;
+        me.struck = true;
+        break;
+      }
+      case 'cutaway': {
+        me.crew = myRemain + board.reserve + board.skeleton;
+        foe.crew = theirRemain;
+        this.regrappleUntil = this.simClock + BOARD_CFG.helm.regrappleCd;
+        break;
+      }
+      case 'stranded': {
+        const saved = Math.round(myRemain * (1 - BOARD_CFG.strandedLossFrac));
+        me.crew = saved + board.reserve + board.skeleton;
+        foe.crew = theirRemain;
+        this.regrappleUntil = this.simClock + BOARD_CFG.helm.regrappleCd;
+        this.events.feed('Half the boarding party never made it back across');
+        break;
+      }
     }
+    this.board = null;
+    this.phase = 'sail';
   }
 
   /* ============ outcomes ============ */

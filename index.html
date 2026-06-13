@@ -65,16 +65,20 @@
 <button id="boardbtn">⚓ GRAPPLE &amp; BOARD</button>
 <button id="dockbtn">⚓ MAKE PORT (B)</button>
 
-<div class="panel" id="boarding">
-  <div class="lbl" id="btitle">BOARDING</div>
-  <div id="bsections"></div>
-  <div id="bfoot">
-    <div class="sub" id="breserve">—</div>
-    <div id="bbtns">
-      <button id="bswivel">SWIVEL (Q)</button>
-      <button id="bpress">PRESS (G)</button>
+<div id="boarding">
+  <div id="bmelee">
+    <div id="btitle">BOARDING</div>
+    <div id="bdemand"></div>
+    <div id="bfronttrack">
+      <div id="bfronttheirs"></div>
+      <div id="bfrontmine"></div>
+      <div id="bfrontmarker"></div>
+      <div class="bfrontcap bcapmine">YOUR DECK</div>
+      <div class="bfrontcap bcaptheirs">THEIR QUARTERDECK</div>
     </div>
+    <div id="bcrews"><span id="bmine">—</span><span id="bvs">vs</span><span id="btheirs">—</span></div>
   </div>
+  <div id="bstations"></div>
 </div>
 <div class="panel" id="hint">A/D steer · W/S sails · 1-3 shot · Q/E fire · F signal · G order · Tab take helm · B board · Esc menu</div>
 

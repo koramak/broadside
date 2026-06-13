@@ -6,6 +6,9 @@ import type { Ship } from './types';
 export type SimEvent =
   | { kind: 'feed'; msg: string }
   | { kind: 'boom'; vol: number; len: number; freq: number }
+  | { kind: 'boardWindow'; station: string } // a gold window just opened — tick!
+  | { kind: 'boardFoul'; station: string } // a window passed unanswered
+  | { kind: 'boardFx'; fx: string; n: number } // presentation cues (smoke, saves, parts)
   | { kind: 'muzzle'; x: number; y: number; dir: number } // smoke puff at a gun port
   | { kind: 'impact'; x: number; y: number } // ball struck timber
   | { kind: 'splash'; x: number; y: number } // ball found only sea

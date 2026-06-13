@@ -52,19 +52,53 @@ button:disabled{opacity:.35;cursor:default}
 #sigbtn{border-color:var(--gold)}
 #boardbtn{position:fixed;bottom:108px;right:12px;padding:14px 20px;font-size:21px;letter-spacing:.08em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
 #dockbtn{position:fixed;bottom:108px;right:12px;padding:14px 20px;font-size:21px;letter-spacing:.08em;border-color:var(--gold);background:rgba(217,164,65,.2);display:none;font-family:Georgia,serif;z-index:5}
-#boarding{bottom:104px;left:50%;transform:translateX(-50%);width:600px;max-width:96vw;display:none;z-index:6;border-color:var(--gold)}
-#btitle{color:var(--gold);margin-bottom:7px}
-.bsec{display:flex;align-items:center;gap:10px;margin:6px 0}
-.bsec .bn{width:140px;font-size:14px;font-family:'Courier New',monospace;letter-spacing:.07em;color:var(--parch-dim);text-align:right}
-.bsec .bbar{flex:1;height:18px;background:rgba(233,220,190,.1);border-radius:4px;position:relative;overflow:hidden}
-.bsec .bp{position:absolute;left:0;top:0;bottom:0;background:var(--gold);opacity:.85}
-.bsec .be{position:absolute;right:0;top:0;bottom:0;background:var(--rust);opacity:.85}
-.bsec .bnum{width:96px;font-size:14px;font-family:'Courier New',monospace;color:var(--parch)}
-.bsec button{font-size:14px;padding:5px 10px}
-#bfoot{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
-#bbtns{display:flex;gap:8px}
-#bbtns button{font-size:14px;padding:6px 13px}
-#bbtns button.on{background:rgba(196,88,58,.3);border-color:var(--rust)}
+/* ===== boarding: the tap-timing station deck ===== */
+#boarding{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);width:min(960px,97vw);
+  display:none;flex-direction:column;gap:12px;z-index:8;align-items:center}
+#bmelee{width:100%;background:rgba(11,27,34,.82);border:1px solid rgba(217,164,65,.4);border-radius:10px;padding:10px 16px}
+#btitle{color:var(--gold);font-family:'Courier New',monospace;font-size:15px;letter-spacing:.14em;text-align:center;margin-bottom:7px}
+#bdemand{text-align:center;font-family:'Courier New',monospace;font-size:15px;letter-spacing:.06em;min-height:20px;transition:color .2s}
+#bdemand.surge{color:var(--rust);font-weight:bold;animation:bpulse .5s infinite alternate}
+#bdemand.axe{color:var(--gold)}
+@keyframes bpulse{from{opacity:.55}to{opacity:1}}
+.bpatience{height:7px;background:rgba(233,220,190,.12);border-radius:4px;overflow:hidden;margin:4px auto 0;width:60%}
+.bpatience i{display:block;height:100%;background:var(--rust);transition:width .1s linear}
+#bfronttrack{position:relative;height:30px;border-radius:6px;overflow:hidden;margin:8px 0 4px;
+  background:rgba(196,88,58,.18);border:1px solid rgba(233,220,190,.18)}
+#bfrontmine{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,rgba(217,164,65,.5),rgba(217,164,65,.28));transition:width .12s}
+#bfronttheirs{position:absolute;right:0;top:0;bottom:0;background:rgba(196,88,58,.32);transition:width .12s}
+#bfrontmarker{position:absolute;top:-3px;bottom:-3px;width:4px;margin-left:-2px;background:var(--gold);
+  box-shadow:0 0 8px rgba(217,164,65,.9);transition:left .12s}
+#bfrontmarker::before{content:'';position:absolute;top:-6px;left:-5px;border:7px solid transparent;border-top-color:var(--gold)}
+.bfrontcap{position:absolute;top:6px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:.1em;color:rgba(233,220,190,.7);pointer-events:none}
+.bcapmine{left:8px}.bcaptheirs{right:8px}
+#bcrews{display:flex;justify-content:space-between;font-family:'Courier New',monospace;font-size:15px}
+#bmine{color:var(--gold)}#btheirs{color:var(--rust)}#bvs{color:var(--parch-dim);font-size:12px;align-self:center}
+#bstations{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.bstation{position:relative;width:96px;height:112px;background:rgba(11,27,34,.82);border:1px solid rgba(233,220,190,.22);
+  border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding-top:8px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:border-color .15s,background .15s}
+.bstation:active{background:rgba(233,220,190,.14)}
+.bring{width:54px;height:54px}
+.btrack{fill:none;stroke:rgba(233,220,190,.14);stroke-width:5}
+.barc{fill:none;stroke:rgba(233,220,190,.5);stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .08s linear,stroke .15s}
+.bkey{position:absolute;top:26px;font-family:Georgia,serif;font-size:18px;color:var(--parch-dim)}
+.blabel{font-family:'Courier New',monospace;font-size:11px;letter-spacing:.06em;margin-top:4px;text-align:center;color:var(--parch)}
+.bsub{font-family:'Courier New',monospace;font-size:10px;color:var(--parch-dim);margin-top:1px;text-align:center;min-height:12px}
+/* phase language — identical everywhere: white run, gold window, red foul */
+.bstation.phase-idle{border-color:rgba(233,220,190,.3)}
+.bstation.phase-idle .barc{stroke:rgba(233,220,190,.25)}
+.bstation.phase-priming .barc{stroke:var(--parch)}
+.bstation.phase-window{border-color:var(--gold);background:rgba(217,164,65,.18);box-shadow:0 0 18px rgba(217,164,65,.45);animation:bwin .4s infinite alternate}
+.bstation.phase-window .barc{stroke:var(--gold)}
+.bstation.phase-window .bkey{color:var(--gold)}
+@keyframes bwin{from{box-shadow:0 0 10px rgba(217,164,65,.3)}to{box-shadow:0 0 22px rgba(217,164,65,.6)}}
+.bstation.phase-fouled{border-color:rgba(196,88,58,.5);opacity:.75}
+.bstation.phase-fouled .barc{stroke:var(--rust)}
+.bstation.phase-spent{opacity:.32;cursor:default}
+.bstation.parted{border-color:var(--rust)}
+.bstation.parted .bsub{color:var(--rust)}
+.bstation.axe .bsub{color:var(--gold)}
 #cargo{bottom:110px;left:12px;display:none;z-index:5;min-width:260px;max-width:340px}
 #cargo .sub{line-height:1.6}
 .rumorhead{color:var(--gold);letter-spacing:.1em;font-size:13px}
@@ -128,8 +162,10 @@ button:disabled{opacity:.35;cursor:default}
   #cargo{bottom:auto;top:170px;min-width:150px;max-width:170px}
   #cargo .sub{font-size:10px}
   #rep{top:300px;min-width:150px}
-  #boarding{bottom:180px;width:96vw}
-  .bsec .bn{width:80px;font-size:10px} .bsec .bnum{width:64px;font-size:10px}
+  #boarding{bottom:12px;width:98vw}
+  .bstation{width:74px;height:96px} .bring{width:46px;height:46px}
+  .blabel{font-size:9px} .bsub{font-size:8px} .bkey{font-size:15px;top:22px}
+  #bstations{gap:6px}
   .hcard.wide{width:96vw}
   .mrow{flex-wrap:wrap;font-size:13px}
   #minimap canvas{width:150px!important;height:106px!important}

@@ -1,222 +1,395 @@
-// Real-time boarding, adapted from reference/broadside-boarding-test-2.html
-// ("Never Leave the Ship") and compressed to keep the pace of the gun fight:
-// three deck sections, committed crew streams, a swivel gun, morale cascades.
-// DESIGN NOTE: this implements the real-time direction of the two boarding
-// prototypes, per the project goal ("boarding must not feel like a pause").
-// The turn-based grid prototype remains in reference/ should that verdict change.
+// BOARDING — the tap-timing station game (LOCKED design, 2026-06-12).
+// One rule everywhere: TAP arms a station, its ring fills, a GOLD WINDOW
+// opens, tap inside it to succeed; let it pass and the station FOULS.
+// Underneath, the melee grinds on raw numbers — the stations are how you
+// cheat the arithmetic. No movement, no carrying, no holds.
+// Constants live in boardingConfig.ts; this module is pure sim (no DOM).
 
+import { BOARD_CFG as C } from './boardingConfig';
 import { EventQueue } from './events';
 import { Rng } from './rng';
 import type { Ship } from './types';
-import { EASY } from './easing';
 
-export const SECTION_NAMES = ['BOW', 'WAIST', 'QUARTERDECK'] as const;
+export type StationId =
+  | 'swivel' | 'swivel2' | 'pistols'
+  | 'line0' | 'line1' | 'line2'
+  | 'surgeon' | 'reserve' | 'helm';
 
-const K = 0.045; // attrition constant per combat tick, from the prototype's family
-const TICK = 0.5;
-const FOOTHOLD_CAP = 14; // only so many hands fit a contested deck section
-const TRANSIT_TIME = 1.4;
-const SWIVEL_CD = 8;
-const SWIVEL_TELEGRAPH = 1.0;
+export type StationPhase = 'idle' | 'priming' | 'window' | 'fouled' | 'spent';
 
-export interface Transit {
-  section: number;
-  n: number;
+export interface Station {
+  id: StationId;
+  phase: StationPhase;
+  /** seconds spent in the current phase */
   t: number;
+  /** durations for the running recipe (set when armed) */
+  primeT: number;
+  windowT: number;
+  foulT: number;
 }
+
+export interface Wounded {
+  /** seconds left on the bleed-out bar */
+  t: number;
+  max: number;
+}
+
+export type BoardingEnd = 'taken' | 'repelled' | 'cutaway' | 'stranded';
 
 export interface BoardingState {
   foe: Ship;
-  /** hands fighting in each section, attacker (p) and defender (e) */
-  secP: [number, number, number];
-  secE: [number, number, number];
-  pReserve: number;
-  eReserve: number;
-  transits: Transit[];
-  swivelCd: number;
-  swivelTarget: { section: number; t: number } | null;
-  press: boolean;
-  done: 'taken' | 'repelled' | null;
-  /** swivel guns mounted on the rails (chandler gear): hits +25% */
-  swivels: boolean;
-  /** defenders who broke and ran below rather than die — captives if you win */
-  fled: number;
-  private_tickT: number;
-  private_aiT: number;
+  /** hands actually trading steel (your reserve waits in the hatch) */
+  myHands: number;
+  theirHands: number;
+  myStart: number;
+  theirStart: number;
+  reserve: number;
+  skeleton: number;
+  /** the front: -1 = your quarterdeck (loss), +1 = through theirs (win) */
+  front: number;
+  /** pistol courage — additive power boost, decays */
+  myBoost: number;
+  /** swivel suppression — seconds their power stays halved */
+  theirHalvedT: number;
+  /** unfed surge — seconds of hard enemy push remaining */
+  pushT: number;
+  stations: Station[];
+  /** rope health per line, 0..1; null entry = line PARTED */
+  lineHealth: [number, number, number];
+  wounded: Wounded[];
+  woundedCarry: number;
+  /** active enemy demands */
+  surge: { t: number } | null;
+  axe: { line: number; t: number } | null;
+  nextEventT: number;
+  /* naval-state modifiers, fixed at grapple */
+  eventGapMul: number;
+  windowMul: number;
+  frayMul: number;
+  surgeonsMate: boolean;
+  helmLocked: boolean;
+  clock: number;
+  done: BoardingEnd | null;
 }
 
-export function startBoarding(me: Ship, foe: Ship, swivels = false): BoardingState {
-  const pTotal = Math.round(me.crew);
-  const eTotal = Math.round(foe.crew);
-  const wave = Math.round(pTotal * 0.4);
-  const per = Math.floor(wave / 3);
-  const defend = Math.round(eTotal * 0.7);
-  const dper = Math.floor(defend / 3);
+export interface BoardingOpts {
+  gauge: boolean;
+  rakedRecently: boolean;
+  secondSwivel: boolean; // GUNS refit ≥ 1
+  toughLines: boolean; // TIMBERS refit ≥ 1
+  surgeonsMate: boolean; // future crew-quality refit
+}
+
+const mk = (id: StationId): Station => ({ id, phase: 'idle', t: 0, primeT: 0, windowT: 0, foulT: 0 });
+
+export function startBoarding(me: Ship, foe: Ship, opts: BoardingOpts): BoardingState {
+  const total = Math.round(me.crew);
+  const skeleton = Math.max(2, Math.round(total * C.skeletonFrac));
+  const boarders = total - skeleton;
+  const reserve = Math.round(boarders * C.reserve.frac);
+  const stations: Station[] = [mk('swivel')];
+  if (opts.secondSwivel) stations.push(mk('swivel2'));
+  stations.push(mk('pistols'), mk('line0'), mk('line1'), mk('line2'), mk('surgeon'), mk('reserve'), mk('helm'));
   return {
     foe,
-    secP: [per, wave - 2 * per, per],
-    secE: [dper, defend - 2 * dper, dper],
-    pReserve: pTotal - wave,
-    eReserve: eTotal - defend,
-    transits: [],
-    swivelCd: 0,
-    swivelTarget: null,
-    press: false,
+    myHands: boarders - reserve,
+    theirHands: Math.round(foe.crew),
+    myStart: boarders - reserve,
+    theirStart: Math.max(1, Math.round(foe.crew)),
+    reserve,
+    skeleton,
+    front: 0,
+    myBoost: 0,
+    theirHalvedT: 0,
+    pushT: 0,
+    stations,
+    lineHealth: [1, 1, 1],
+    wounded: [],
+    woundedCarry: 0,
+    surge: null,
+    axe: null,
+    nextEventT: 4.5, // first demand comes early; outnumbered = clock from second one
+    eventGapMul: opts.rakedRecently ? C.rakeCadenceMul : 1,
+    windowMul: (opts.gauge ? C.gaugeWindowMul : 1) * C.windowScale,
+    frayMul: opts.toughLines ? C.timbersFrayMul : 1,
+    surgeonsMate: opts.surgeonsMate,
+    helmLocked: false,
+    clock: 0,
     done: null,
-    swivels,
-    fled: 0,
-    private_tickT: 0,
-    private_aiT: 2.0,
   };
 }
 
-export function totalP(b: BoardingState): number {
-  return b.secP[0] + b.secP[1] + b.secP[2] + b.pReserve + b.transits.reduce((t, tr) => t + tr.n, 0);
+export const station = (b: BoardingState, id: StationId): Station | undefined =>
+  b.stations.find((s) => s.id === id);
+
+const lineIdx = (id: StationId): number =>
+  id === 'line0' ? 0 : id === 'line1' ? 1 : 2;
+
+export const isLine = (id: StationId): boolean => id.startsWith('line');
+
+/** Effective melee powers — what the front and the attrition read. */
+export function powers(b: BoardingState): { mine: number; theirs: number } {
+  const mine = b.myHands * (1 + b.myBoost);
+  const theirs = b.theirHands * (b.theirHalvedT > 0 ? 0.5 : 1);
+  return { mine, theirs };
 }
 
-export function totalE(b: BoardingState): number {
-  return b.secE[0] + b.secE[1] + b.secE[2] + b.eReserve;
-}
-
-/** Send ten hands across to a section. Committed: they're nobody's until they land. */
-export function sendHands(b: BoardingState, section: number): boolean {
-  if (b.done || b.pReserve < 1) return false;
-  const n = Math.min(10, b.pReserve);
-  b.pReserve -= n;
-  b.transits.push({ section, n, t: TRANSIT_TIME });
-  return true;
-}
-
-/** Swivel gun: telegraphed scatter into the thickest enemy section. */
-export function fireSwivel(b: BoardingState): boolean {
-  if (b.done || b.swivelCd > 0 || b.swivelTarget) return false;
-  let best = 0;
-  for (let i = 1; i < 3; i++) if (b.secE[i] > b.secE[best]) best = i;
-  b.swivelTarget = { section: best, t: SWIVEL_TELEGRAPH };
-  b.swivelCd = SWIVEL_CD;
-  return true;
-}
-
-export function togglePress(b: BoardingState): void {
-  b.press = !b.press;
-}
-
-export function stepBoarding(
+/** TAP. The whole interface. Returns what happened so the UI can react. */
+export function tap(
   b: BoardingState,
-  dt: number,
+  id: StationId,
   rng: Rng,
   events: EventQueue,
-  myName: string,
-  myMaxCrew: number,
-): void {
+): 'armed' | 'hit' | 'dead' | null {
+  if (b.done) return null;
+  const s = station(b, id);
+  if (!s || s.phase === 'spent') return null;
+  const pace = C.paceScale;
+
+  if (s.phase === 'idle') {
+    // arm the station — pick the recipe
+    if (id === 'swivel' || id === 'swivel2') {
+      s.primeT = C.swivel.prime / pace;
+      s.windowT = (C.swivel.window * b.windowMul) / pace;
+      s.foulT = C.swivel.foul / pace;
+    } else if (id === 'pistols') {
+      s.primeT = C.pistols.load / pace;
+      s.windowT = (C.pistols.window * b.windowMul) / pace;
+      s.foulT = C.pistols.foul / pace;
+    } else if (isLine(id)) {
+      const parted = b.lineHealth[lineIdx(id)] <= 0;
+      s.primeT = (parted ? C.lines.rerig : C.lines.heave) / pace;
+      s.windowT = ((parted ? C.lines.rerigWindow : C.lines.heaveWindow) * b.windowMul) / pace;
+      s.foulT = (parted ? C.lines.rerigFoul : C.lines.heaveFoul) / pace;
+    } else if (id === 'surgeon') {
+      if (!b.wounded.length) return null; // empty table
+      const t = b.surgeonsMate ? C.surgeonsMate : C.surgeon;
+      s.primeT = t.surgery / pace;
+      s.windowT = (t.window * b.windowMul) / pace;
+      s.foulT = C.surgeon.foul / pace;
+    } else if (id === 'reserve') {
+      if (b.reserve <= 0) return null;
+      s.primeT = C.reserve.arm / pace;
+      s.windowT = (C.reserve.window * b.windowMul) / pace;
+      s.foulT = C.reserve.foul / pace;
+    } else if (id === 'helm') {
+      if (b.helmLocked) return null;
+      s.primeT = C.helm.arm / pace;
+      s.windowT = (C.helm.window * b.windowMul) / pace;
+      s.foulT = C.helm.foul / pace;
+    }
+    s.phase = 'priming';
+    s.t = 0;
+    return 'armed';
+  }
+
+  if (s.phase === 'window') {
+    s.phase = 'idle';
+    s.t = 0;
+    applyHit(b, id, rng, events);
+    return 'hit';
+  }
+
+  // priming or fouled: taps do nothing — patience is part of the skill
+  return 'dead';
+}
+
+/** Station succeeded inside its gold window. */
+function applyHit(b: BoardingState, id: StationId, rng: Rng, events: EventQueue): void {
+  if (id === 'swivel' || id === 'swivel2') {
+    const kill = Math.round(rng.rnd(C.swivel.killMin, C.swivel.killMax));
+    b.theirHands = Math.max(0, b.theirHands - kill);
+    b.theirHalvedT = C.swivel.halveT;
+    feedSurge(b, events);
+    events.emit({ kind: 'boardFx', fx: 'swivel', n: kill });
+    events.boom(0.34, 0.3, 520);
+  } else if (id === 'pistols') {
+    const kill = Math.round(rng.rnd(C.pistols.killMin, C.pistols.killMax));
+    b.theirHands = Math.max(0, b.theirHands - kill);
+    b.front = Math.min(1, b.front + C.pistols.frontPush);
+    b.myBoost = Math.min(0.6, b.myBoost + C.pistols.boost);
+    feedSurge(b, events);
+    events.emit({ kind: 'boardFx', fx: 'pistols', n: kill });
+    events.boom(0.22, 0.16, 800);
+  } else if (isLine(id)) {
+    const i = lineIdx(id);
+    const wasParted = b.lineHealth[i] <= 0;
+    b.lineHealth[i] = wasParted ? C.lines.rerigHealth : 1;
+    events.emit({ kind: 'boardFx', fx: wasParted ? 'rerig' : 'heave', n: i });
+    if (wasParted) events.feed('The ' + LINE_NAMES[i].toLowerCase() + ' is re-rigged — hulls breathe together again');
+  } else if (id === 'surgeon') {
+    if (b.wounded.length) {
+      b.wounded.shift();
+      b.myHands += 1;
+      events.emit({ kind: 'boardFx', fx: 'saved', n: 1 });
+      events.feed('The surgeon turns one loose — back to the rail with you');
+    }
+  } else if (id === 'reserve') {
+    b.myHands += b.reserve;
+    events.feed(b.reserve + ' from the hatch — everything you have, committed');
+    b.reserve = 0;
+    b.front = Math.min(1, b.front + C.reserve.frontShove);
+    b.helmLocked = true;
+    const rs = station(b, 'reserve');
+    if (rs) rs.phase = 'spent';
+    const hs = station(b, 'helm');
+    if (hs) hs.phase = 'spent';
+    events.emit({ kind: 'boardFx', fx: 'reserve', n: 0 });
+    events.boom(0.3, 0.4, 240);
+  } else if (id === 'helm') {
+    b.done = 'cutaway';
+    events.feed('CUT AND RUN — lines away, the sea takes you back');
+  }
+}
+
+/** Any swivel or pistol success feeds a waiting surge. */
+function feedSurge(b: BoardingState, events: EventQueue): void {
+  if (b.surge) {
+    b.surge = null;
+    events.emit({ kind: 'boardFx', fx: 'surgeFed', n: 0 });
+    events.feed('The surge meets grape and pistol smoke — it breaks');
+  }
+}
+
+export const LINE_NAMES = ['BOW LINE', 'MIDSHIP LINE', 'STERN LINE'];
+
+export function stepBoarding(b: BoardingState, dt: number, rng: Rng, events: EventQueue): void {
   if (b.done) return;
+  const pace = C.paceScale;
+  b.clock += dt;
 
-  b.swivelCd = Math.max(0, b.swivelCd - dt);
-
-  // crew streams land
-  for (let i = b.transits.length - 1; i >= 0; i--) {
-    const tr = b.transits[i];
-    tr.t -= dt;
-    if (tr.t <= 0) {
-      b.secP[tr.section] += tr.n;
-      b.transits.splice(i, 1);
-    }
-  }
-
-  // swivel fires after its telegraph
-  if (b.swivelTarget) {
-    b.swivelTarget.t -= dt;
-    if (b.swivelTarget.t <= 0) {
-      const s = b.swivelTarget.section;
-      const hit = Math.min(b.secE[s], Math.round(6 + rng.rnd(4)));
-      b.secE[s] -= hit;
-      events.boom(0.3, 0.25, 600);
-      events.feed('Swivel gun sweeps the ' + SECTION_NAMES[s].toLowerCase() + ' — ' + hit + ' down');
-      b.swivelTarget = null;
-    }
-  }
-
-  // combat ticks
-  b.private_tickT += dt;
-  if (b.private_tickT >= TICK) {
-    b.private_tickT = 0;
-    const routedE: number[] = [];
-    const routedP: number[] = [];
-    for (let i = 0; i < 3; i++) {
-      const p = b.secP[i];
-      const e = b.secE[i];
-      if (p <= 0 || e <= 0) continue;
-      const pEff = Math.min(p, FOOTHOLD_CAP);
-      const eEff = Math.min(e, FOOTHOLD_CAP);
-      const pLoss = eEff * K * (b.press ? 1.25 : 0.8) * rng.rnd(0.8, 1.2) * (EASY.on ? EASY.boardLossToPlayer : 1);
-      const eLoss = pEff * K * (b.press ? 1.45 : 1.0) * (b.swivels ? 1.25 : 1) * rng.rnd(0.8, 1.2);
-      b.secP[i] = Math.max(0, p - pLoss);
-      b.secE[i] = Math.max(0, e - eLoss);
-      if (e > 0 && b.secE[i] <= 0.5) {
-        b.secE[i] = 0;
-        routedE.push(i);
+  /* stations advance */
+  for (const s of b.stations) {
+    if (s.phase === 'priming') {
+      s.t += dt;
+      if (s.t >= s.primeT) {
+        s.phase = 'window';
+        s.t = 0;
+        events.emit({ kind: 'boardWindow', station: s.id });
       }
-      if (p > 0 && b.secP[i] <= 0.5) {
-        b.secP[i] = 0;
-        routedP.push(i);
-      }
-    }
-    // morale cascade: a cleared section panics its neighbours
-    for (const i of routedE) {
-      events.feed('Their ' + SECTION_NAMES[i].toLowerCase() + ' breaks!');
-      events.boom(0.18, 0.15, 900);
-      for (const j of [i - 1, i + 1]) {
-        if (j >= 0 && j < 3) {
-          // the cascade: neighbors see the rout and some throw down steel —
-          // they're not dead, they're captives-in-waiting below decks
-          b.fled += b.secE[j] * 0.15;
-          b.secE[j] *= 0.85;
+    } else if (s.phase === 'window') {
+      s.t += dt;
+      if (s.t >= s.windowT) {
+        // the window passed unanswered
+        s.t = 0;
+        if (s.id === 'surgeon') {
+          // a missed window kills the man on the table
+          if (b.wounded.length) {
+            b.wounded.shift();
+            events.feed('Lost him on the table. The surgeon doesn’t look up.');
+            events.emit({ kind: 'boardFx', fx: 'tableDeath', n: 1 });
+          }
+          s.phase = 'fouled';
+        } else if (isLine(s.id)) {
+          // missed heave: the line slips
+          const i = lineIdx(s.id);
+          if (b.lineHealth[i] > 0) {
+            b.lineHealth[i] = Math.max(0, b.lineHealth[i] - C.lines.slipPenalty);
+            events.emit({ kind: 'boardFx', fx: 'slip', n: i });
+          }
+          s.phase = 'fouled';
+        } else {
+          s.phase = 'fouled';
         }
+        events.emit({ kind: 'boardFoul', station: s.id });
       }
-    }
-    for (const i of routedP) {
-      events.feed('Your hands are cleared from the ' + SECTION_NAMES[i].toLowerCase());
-      for (const j of [i - 1, i + 1]) {
-        if (j >= 0 && j < 3) b.secP[j] *= 0.88;
-      }
-    }
-  }
-
-  // defender AI: plug the weakest hole; surge when ahead
-  b.private_aiT -= dt;
-  if (b.private_aiT <= 0) {
-    b.private_aiT = 2.5;
-    if (b.eReserve >= 1) {
-      let weakest = 0;
-      let worst = Infinity;
-      for (let i = 0; i < 3; i++) {
-        const deficit = b.secE[i] - b.secP[i];
-        if (deficit < worst) {
-          worst = deficit;
-          weakest = i;
-        }
-      }
-      const n = Math.min(8, b.eReserve);
-      b.eReserve -= n;
-      b.secE[weakest] += n;
-      if (totalE(b) > totalP(b) * 1.3 && b.eReserve >= 5) {
-        let strongest = 0;
-        for (let i = 1; i < 3; i++) if (b.secE[i] > b.secE[strongest]) strongest = i;
-        b.eReserve -= 5;
-        b.secE[strongest] += 5;
+    } else if (s.phase === 'fouled') {
+      s.t += dt;
+      if (s.t >= s.foulT) {
+        s.phase = 'idle';
+        s.t = 0;
       }
     }
   }
 
-  // outcome — same surrender thresholds as the placeholder auto-resolve
-  const pT = totalP(b);
-  const eT = totalE(b);
-  if (eT <= Math.max(4, Math.round(b.foe.maxCrew * 0.1))) {
+  /* boosts decay */
+  b.myBoost = Math.max(0, b.myBoost - C.pistols.boostDecay * dt);
+  b.theirHalvedT = Math.max(0, b.theirHalvedT - dt);
+
+  /* lines fray */
+  for (let i = 0; i < 3; i++) {
+    if (b.lineHealth[i] <= 0) continue;
+    const axeHere = b.axe && b.axe.line === i;
+    b.lineHealth[i] -= C.lines.frayRate * b.frayMul * (axeHere ? C.lines.axeFrayMul : 1) * dt * pace;
+    if (b.lineHealth[i] <= 0) {
+      b.lineHealth[i] = 0;
+      events.feed(LINE_NAMES[i] + ' PARTS — the hulls grind apart there');
+      events.emit({ kind: 'boardFx', fx: 'parted', n: i });
+      events.boom(0.3, 0.25, 180);
+    }
+  }
+  if (b.lineHealth[0] <= 0 && b.lineHealth[1] <= 0 && b.lineHealth[2] <= 0) {
+    b.done = 'stranded';
+    events.feed('All three lines gone — the boarders are stranded as the ships part');
+    return;
+  }
+
+  /* enemy demands */
+  b.nextEventT -= dt * pace;
+  if (!b.surge && !b.axe && b.nextEventT <= 0) {
+    b.nextEventT = rng.rnd(C.eventGapMin, C.eventGapMax) * b.eventGapMul;
+    if (rng.random() < C.surgeChance) {
+      b.surge = { t: C.surge.patience };
+      events.emit({ kind: 'boardFx', fx: 'surgeUp', n: 0 });
+      events.feed('THEY MASS AT THE RAIL — feed them steel before they jump');
+    } else {
+      const live = [0, 1, 2].filter((i) => b.lineHealth[i] > 0);
+      const line = live.length ? live[rng.int(live.length)] : 0;
+      b.axe = { line, t: C.axe.duration };
+      events.emit({ kind: 'boardFx', fx: 'axeUp', n: line });
+      events.feed('An axe at the ' + LINE_NAMES[line].toLowerCase() + '!');
+    }
+  }
+  if (b.surge) {
+    b.surge.t -= dt;
+    if (b.surge.t <= 0) {
+      b.surge = null;
+      b.pushT = C.surge.pushT;
+      events.feed('The surge comes over the rail unanswered — hold, HOLD—');
+      events.boom(0.4, 0.5, 200);
+    }
+  }
+  if (b.axe) {
+    b.axe.t -= dt;
+    if (b.axe.t <= 0) b.axe = null;
+  }
+
+  /* the melee — raw numbers grinding */
+  const p = powers(b);
+  const myLoss = C.K * C.attritionScale * p.theirs * dt * pace;
+  const theirLoss = C.K * C.attritionScale * p.mine * dt * pace;
+  b.theirHands = Math.max(0, b.theirHands - theirLoss);
+  const before = b.myHands;
+  b.myHands = Math.max(0, b.myHands - myLoss);
+  // a share of your fallen reach the surgeon alive
+  b.woundedCarry += (before - b.myHands) * C.woundedFrac;
+  while (b.woundedCarry >= 1 && b.wounded.length < C.woundedMax) {
+    b.woundedCarry -= 1;
+    b.wounded.push({ t: C.surgeon.bleedOut, max: C.surgeon.bleedOut });
+  }
+
+  /* bleed-out bars run regardless */
+  for (let i = b.wounded.length - 1; i >= 0; i--) {
+    b.wounded[i].t -= dt;
+    if (b.wounded[i].t <= 0) {
+      b.wounded.splice(i, 1);
+      events.emit({ kind: 'boardFx', fx: 'bledOut', n: 1 });
+    }
+  }
+
+  /* the front drifts toward whoever is weaker */
+  const span = Math.max(p.mine, p.theirs, 1);
+  b.front += C.FRONT_K * ((p.mine - p.theirs) / span) * dt * pace;
+  if (b.pushT > 0) {
+    b.pushT -= dt;
+    b.front -= C.surge.pushRate * dt;
+  }
+  b.front = Math.max(-1, Math.min(1, b.front));
+
+  /* resolution */
+  if (b.front >= 1 || b.theirHands <= b.theirStart * C.loseCrewFrac) {
     b.done = 'taken';
-    events.feed(b.foe.name + ' is taken!');
-    events.boom(0.4, 0.4, 300);
-  } else if (pT <= Math.max(4, Math.round(myMaxCrew * 0.1))) {
+  } else if (b.front <= -1 || b.myHands <= b.myStart * C.loseCrewFrac) {
     b.done = 'repelled';
-    events.feed('Boarders repelled — ' + myName + ' is lost');
   }
 }

@@ -10,6 +10,9 @@ import { TAU } from '../sim/math';
 const CAM_ELEV = (55 * Math.PI) / 180;
 const CAM_DIST = 1150;
 const CAM_FOV = 42;
+// Boarding closeup: lean in over the tabletop — closer and a touch steeper.
+const BOARD_ELEV = (62 * Math.PI) / 180;
+const BOARD_DIST = 560;
 
 const SEA_SIZE = 4600;
 const SEA_SEGS = 92;
@@ -19,6 +22,9 @@ export class SceneShell {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   private camTarget = new THREE.Vector3();
+  /** 0 = sailing wide, 1 = boarding closeup — glides between the two */
+  private focus = 0;
+  private focusTarget = 0;
   private seaGeo: THREE.PlaneGeometry;
   private sea: THREE.Mesh;
   private seaTime = { value: 0 };
@@ -132,13 +138,23 @@ export class SceneShell {
     this.follow(x, y, 0);
   }
 
+  /** Glide toward (1) or away from (0) the boarding closeup. */
+  setFocus(on: boolean): void {
+    this.focusTarget = on ? 1 : 0;
+  }
+
   /** Smoothly follow a sim-space point (sim x,y → world x,z). */
   follow(x: number, y: number, dt: number): void {
     const k = 1 - Math.exp(-dt * 3.2);
     this.camTarget.x += (x - this.camTarget.x) * k;
     this.camTarget.z += (y - this.camTarget.z) * k;
-    const back = CAM_DIST * Math.cos(CAM_ELEV);
-    const up = CAM_DIST * Math.sin(CAM_ELEV);
+    // ease the focus blend so the grapple "leans in" rather than snaps
+    this.focus += (this.focusTarget - this.focus) * Math.min(1, dt * 2.4);
+    const f = this.focus < 0.001 ? 0 : this.focus > 0.999 ? 1 : this.focus * this.focus * (3 - 2 * this.focus);
+    const dist = CAM_DIST + (BOARD_DIST - CAM_DIST) * f;
+    const elev = CAM_ELEV + (BOARD_ELEV - CAM_ELEV) * f;
+    const back = dist * Math.cos(elev);
+    const up = dist * Math.sin(elev);
     this.camera.position.set(this.camTarget.x, up, this.camTarget.z + back);
     this.camera.lookAt(this.camTarget.x, 0, this.camTarget.z);
   }

@@ -12,6 +12,8 @@ export interface InputActions {
   signal(): void;
   toggleOrder(): void;
   board(): void;
+  /** tap the nth station during a boarding deck-fight (0-indexed) */
+  boardStation(n: number): void;
   nextHelm(): void;
   togglePause(): void;
 }
@@ -38,6 +40,10 @@ export class Input {
       }
       if (k.startsWith('arrow')) e.preventDefault();
       if (!this.enabled) return;
+      // number keys double as boarding station shortcuts; the game routes
+      // them to ammo or to a station depending on the phase
+      const digit = '123456789'.indexOf(k);
+      if (digit >= 0) actions.boardStation(digit);
       if (k === '1') actions.setAmmo(0);
       if (k === '2') actions.setAmmo(1);
       if (k === '3') actions.setAmmo(2);

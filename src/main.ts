@@ -22,7 +22,7 @@ import { HarborScreen } from './ui/harbor';
 import { PortScreen } from './ui/port';
 import { Input } from './input/input';
 import { Minimap } from './ui/minimap';
-import { audio, boom, setMusic } from './audio';
+import { audio, boom, setMusic, boardTick, boardFoul } from './audio';
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 import { refreshRumors } from './sim/economy';
 import { PORTS } from './sim/worldgen';
@@ -149,21 +149,18 @@ function showVictory(): void {
 
 const input = new Input({
   setAmmo: (i) => {
-    if (mode === 'battle' && battle && !paused) {
-      if (battle.phase === 'board') {
-        battle.boardSend(i);
-        return;
-      }
+    if (mode === 'battle' && battle && !paused && battle.phase === 'sail') {
       battle.setAmmo(i);
       hud.setAmmoUI(i);
     }
   },
+  boardStation: (n) => {
+    if (mode === 'battle' && battle && !paused && battle.phase === 'board') {
+      battle.boardTapIndex(n);
+    }
+  },
   fire: (side) => {
-    if (mode === 'battle' && battle && !paused) {
-      if (battle.phase === 'board') {
-        if (side === 0) battle.boardSwivel();
-        return;
-      }
+    if (mode === 'battle' && battle && !paused && battle.phase === 'sail') {
       battle.fire(battle.P(), side);
     }
   },
@@ -181,11 +178,7 @@ const input = new Input({
     if (mode === 'battle' && battle && !paused) battle.signal();
   },
   toggleOrder: () => {
-    if (mode === 'battle' && battle && !paused) {
-      if (battle.phase === 'board') {
-        battle.boardPress();
-        return;
-      }
+    if (mode === 'battle' && battle && !paused && battle.phase === 'sail') {
       battle.toggleOrder();
       hud.syncOrderBtn(battle);
     }
@@ -209,14 +202,8 @@ const input = new Input({
 hud.onTakeHelm = (idx) => {
   if (mode === 'battle' && battle && !paused && battle.takeHelm(idx)) hud.applyHelmUI(battle);
 };
-hud.onBoardSend = (i) => {
-  if (mode === 'battle' && battle && !paused) battle.boardSend(i);
-};
-hud.onBoardSwivel = () => {
-  if (mode === 'battle' && battle && !paused) battle.boardSwivel();
-};
-hud.onBoardPress = () => {
-  if (mode === 'battle' && battle && !paused) battle.boardPress();
+hud.onBoardTap = (id) => {
+  if (mode === 'battle' && battle && !paused) battle.boardTap(id);
 };
 
 harbor.bind();
@@ -401,6 +388,20 @@ function frame(now: number): void {
         case 'wake':
           effects.wake(e.x, e.y);
           break;
+        case 'boardWindow':
+          boardTick(e.station); // the pitched percussion cue
+          break;
+        case 'boardFoul':
+          boardFoul();
+          break;
+        case 'boardFx':
+          if (battle && battle.board) {
+            const me = battle.P();
+            const off = e.fx === 'parted' || e.fx === 'slip' ? 18 : 0;
+            if (e.fx === 'swivel' || e.fx === 'pistols' || e.fx === 'parted')
+              effects.smoke(me.x + off, me.y, me.heading + Math.PI / 2);
+          }
+          break;
         default:
           break;
       }
@@ -413,6 +414,7 @@ function frame(now: number): void {
   // render
   if (mode === 'battle' && battle) {
     const p = battle.P();
+    shell.setFocus(battle.phase === 'board'); // lean in over the grapple
     shell.follow(p.x, p.y, dtReal);
     shell.updateEnvironment(simTime, battle.wind.dir, paused);
     for (const sv of shipViews) sv.update(sv.ship === p, simTime);
@@ -427,6 +429,7 @@ function frame(now: number): void {
     if (!paused) hud.updateFeed(dtReal);
   } else if ((mode === 'map' || mode === 'port' || mode === 'aftermath') && world) {
     const p = world.player;
+    shell.setFocus(false);
     shell.follow(p.x, p.y, dtReal);
     shell.updateEnvironment(simTime, world.wind.dir, paused || mode !== 'map');
     playerMapView?.update(true, simTime);

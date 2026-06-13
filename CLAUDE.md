@@ -40,12 +40,29 @@ Primary asset source: Kenney Pirate Kit (kenney.nl/assets/pirate-kit) — 70 3D 
 - Armada: captains with doctrines (Bulldog/Surgeon/Corsair), two in-battle verbs only — signal gun (rolling fleet volley) and engage/form-on-me toggle. Possession (take any helm). Max 2 consorts for now.
 - Run structure (vertical slice): 6 escalating battles to the Plate Ship. Prizes: crew her / strip her (sloop→canvas, brig→guns, frigate→timbers, stack ×3) / sell her. Persistent flagship damage, stores economy, pressed hands pool. Keep this loop intact.
 - Double-shotting was tested and CUT. Do not reintroduce.
+- Boarding (LOCKED 2026-06-13): tap-timing station game, chosen over the deck-push,
+  stream, and grid-tactics prototypes. ONE rule per station: TAP arms it → ring fills
+  (white) → GOLD WINDOW opens → tap inside to succeed → miss it and it FOULS (red, dead
+  time). No movement/carrying/holds. Skill = staggering timers so windows arrive in
+  sequence while the melee underneath drifts on raw crew numbers. Stations: swivel
+  (+swivel2 if GUNS≥1), pistols, 3 lines (fray; PARTED = long re-rig; all 3 parted =
+  stranded), surgeon (wounded bleed-out queue), reserve (commits all, locks helm), helm
+  (cut & run, 15s re-grapple cd). Enemy demands: SURGE (patience bar, fed by any
+  swivel/pistol hit) and AXE (one line frays ~7×). Naval hooks: defenders = real crew at
+  grapple, boarders = crew −10% skeleton, reserve = 25%; raked-recently slows enemy
+  cadence; weather gauge widens your windows 20%; TIMBERS≥1 slows fray; surgeon's-mate
+  hook reserved for a future crew-quality refit. Win = struck ship → existing prize flow.
+  ALL constants live in src/sim/boardingConfig.ts (window.__broadside-exposed), FEEL dials.
+  NOTE: spec's FRONT_K 0.045 forces a ~22s skilled floor that fights the spec's own
+  45–90s target; target won, FRONT_K tuned to 0.024. The 4d-tapping.html reference was
+  never committed to /reference, so the spec text + feel are the source of truth. Audio:
+  distinct pitched percussion tick per station when its window opens (the key juice item).
 
 ## Open questions (do NOT resolve unilaterally)
 
 - Combat dials pending playtests: ball speed 220/270/360, reload 4.5/5.5/7, rake full/reduced.
   (Dials are now live in the pause menu; defaults remain the locked values.)
-- Boarding: two competing prototypes exist (/reference/broadside-boarding-test-2.html real-time streams, /reference/broadside-boarding-test-3.html turn-based grid). The 2026-06-12 goal directive ("boarding must not feel like a pause") was read as picking the real-time direction, and a compact real-time deck fight (src/sim/boarding.ts) replaced the auto-resolve. HUMAN VERDICT 2026-06-12: current implementation is not good enough ("boarding sucks") — boarding rework is the agreed NEXT work item. The real-time direction wasn't rejected, the execution was. Grid prototype remains a candidate.
+- (RESOLVED 2026-06-13 — see Locked Mechanics) Boarding is the tap-timing station game.
 - Rare-ship rule-break taxonomy: designed in conversation with the human, not in code. (One enemy-only rule-breaker shipped as the late-game antagonist: the Drowned ignore the point-of-sail curve. Player-ownable rule-breakers remain undesigned, as agreed.)
 - Title: BROADSIDE is a placeholder.
 

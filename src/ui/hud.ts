@@ -10,8 +10,9 @@ import { GOODS, cargoLoad, fleetCargoCap } from '../sim/economy';
 import { FACTIONS } from '../sim/worldgen';
 import { clamp, dist as distLike } from '../sim/math';
 import type { RunState } from '../sim/types';
-import { SECTION_NAMES } from '../sim/boarding';
-import type { BoardingState } from '../sim/boarding';
+import { LINE_NAMES, station as boardStation } from '../sim/boarding';
+import type { BoardingState, Station, StationId } from '../sim/boarding';
+import { BOARD_CFG } from '../sim/boardingConfig';
 import { currentObjective } from '../sim/objectives';
 import { audio } from '../audio';
 
@@ -123,6 +124,21 @@ export class Hud {
   sync(battle: Battle, paused: boolean): void {
     const s = battle.P();
     const foe = battle.nearestEnemy(s);
+
+    // during a boarding deck-fight the sailing controls give way to the
+    // station deck — hide the helm/guns/ammo so nothing bleeds through
+    const boarding = battle.phase === 'board';
+    $('ammo').style.display = boarding ? 'none' : 'flex';
+    $('helm').style.display = boarding ? 'none' : 'flex';
+    $('guns').style.display = boarding ? 'none' : 'flex';
+    if (boarding) {
+      $('sigbtn').style.display = 'none';
+      $('orderbtn').style.display = 'none';
+      $('boardbtn').style.display = 'none';
+      $('hint').style.display = 'none';
+      return; // the station deck (syncBoarding) carries the rest
+    }
+    $('hint').style.display = '';
     $('ph').style.width = (s.hull / s.maxHull) * 100 + '%';
     $('ps').style.width = s.sailHP + '%';
     $('pc').style.width = (s.crew / s.maxCrew) * 100 + '%';
@@ -228,45 +244,77 @@ export class Hud {
     for (const el of this.arrowPool) el.style.display = 'none';
   }
 
-  /* ============ boarding panel ============ */
+  /* ============ boarding: the tap-timing station deck ============ */
 
-  private boardingRows: { bp: HTMLElement; be: HTMLElement; num: HTMLElement; send: HTMLButtonElement }[] = [];
-  onBoardSend: (section: number) => void = () => {};
-  onBoardSwivel: () => void = () => {};
-  onBoardPress: () => void = () => {};
+  onBoardTap: (id: StationId) => void = () => {};
+  private builtFor = '';
+  private ringC = 2 * Math.PI * 26; // ring circumference for the SVG timers
+  private cards = new Map<StationId, { el: HTMLElement; arc: SVGCircleElement; sub: HTMLElement }>();
 
-  private buildBoardingRows(): void {
-    if (this.boardingRows.length) return;
-    const wrap = $('bsections');
-    SECTION_NAMES.forEach((name, i) => {
-      const row = document.createElement('div');
-      row.className = 'bsec';
-      row.innerHTML =
-        `<span class="bn">${name}</span><div class="bbar"><div class="bp"></div><div class="be"></div></div>` +
-        `<span class="bnum"></span>`;
-      const send = document.createElement('button');
-      send.textContent = 'SEND 10 (' + (i + 1) + ')';
-      send.addEventListener('click', () => {
+  private static LABELS: Record<string, string> = {
+    swivel: 'SWIVEL', swivel2: 'SWIVEL II', pistols: 'PISTOLS',
+    line0: 'BOW LINE', line1: 'MIDSHIP LINE', line2: 'STERN LINE',
+    surgeon: 'SURGEON', reserve: 'RESERVE', helm: 'HELM',
+  };
+
+  /** Build a card per station the first time we see this fight's roster. */
+  private buildStations(board: BoardingState): void {
+    const key = board.stations.map((s) => s.id).join(',');
+    if (this.builtFor === key) return;
+    this.builtFor = key;
+    const wrap = $('bstations');
+    wrap.innerHTML = '';
+    this.cards.clear();
+    board.stations.forEach((st, i) => {
+      const card = document.createElement('div');
+      card.className = 'bstation';
+      card.innerHTML =
+        `<svg class="bring" viewBox="0 0 60 60">` +
+        `<circle class="btrack" cx="30" cy="30" r="26"/>` +
+        `<circle class="barc" cx="30" cy="30" r="26" transform="rotate(-90 30 30)"` +
+        ` stroke-dasharray="${this.ringC.toFixed(1)}" stroke-dashoffset="${this.ringC.toFixed(1)}"/></svg>` +
+        `<div class="bkey">${i + 1}</div>` +
+        `<div class="blabel">${Hud.LABELS[st.id]}</div>` +
+        `<div class="bsub"></div>`;
+      card.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
         audio();
-        this.onBoardSend(i);
+        this.onBoardTap(st.id);
       });
-      row.appendChild(send);
-      wrap.appendChild(row);
-      this.boardingRows.push({
-        bp: row.querySelector('.bp') as HTMLElement,
-        be: row.querySelector('.be') as HTMLElement,
-        num: row.querySelector('.bnum') as HTMLElement,
-        send,
+      wrap.appendChild(card);
+      this.cards.set(st.id, {
+        el: card,
+        arc: card.querySelector('.barc') as SVGCircleElement,
+        sub: card.querySelector('.bsub') as HTMLElement,
       });
     });
-    $('bswivel').addEventListener('click', () => {
-      audio();
-      this.onBoardSwivel();
-    });
-    $('bpress').addEventListener('click', () => {
-      audio();
-      this.onBoardPress();
-    });
+  }
+
+  /** Per-station ring fraction (0..1) and the phase class. */
+  private ringFor(st: Station): { frac: number; phase: string } {
+    if (st.phase === 'priming') return { frac: st.primeT ? st.t / st.primeT : 0, phase: 'priming' };
+    // window + fouled drain (full → empty) to read as urgency
+    if (st.phase === 'window') return { frac: st.windowT ? 1 - st.t / st.windowT : 0, phase: 'window' };
+    if (st.phase === 'fouled') return { frac: st.foulT ? 1 - st.t / st.foulT : 0, phase: 'fouled' };
+    if (st.phase === 'spent') return { frac: 0, phase: 'spent' };
+    return { frac: 0, phase: 'idle' };
+  }
+
+  private subFor(st: Station, board: BoardingState): string {
+    if (st.id === 'surgeon') {
+      const n = board.wounded.length;
+      return n ? n + ' on the table' : 'no wounded';
+    }
+    if (st.id === 'reserve') return st.phase === 'spent' ? 'committed' : board.reserve + ' in the hatch';
+    if (st.id === 'helm') return st.phase === 'spent' ? 'lashed in' : 'cut & run';
+    if (st.id.startsWith('line')) {
+      const i = st.id === 'line0' ? 0 : st.id === 'line1' ? 1 : 2;
+      const h = board.lineHealth[i];
+      if (h <= 0) return 'PARTED — re-rig';
+      if (board.axe && board.axe.line === i) return '🪓 AXE — ' + Math.round(h * 100) + '%';
+      return Math.round(h * 100) + '%';
+    }
+    return '';
   }
 
   syncBoarding(board: BoardingState | null): void {
@@ -275,28 +323,57 @@ export class Hud {
       panel.style.display = 'none';
       return;
     }
-    this.buildBoardingRows();
-    panel.style.display = 'block';
-    $('btitle').textContent = 'BOARDING — ' + board.foe.name;
-    for (let i = 0; i < 3; i++) {
-      const r = this.boardingRows[i];
-      const p = board.secP[i];
-      const e = board.secE[i];
-      const span = Math.max(p + e, 1);
-      r.bp.style.width = (p / span) * 48 + '%';
-      r.be.style.width = (e / span) * 48 + '%';
-      const incoming = board.transits.filter((t) => t.section === i).reduce((t, tr) => t + tr.n, 0);
-      r.num.textContent = Math.round(p) + (incoming ? '+' + incoming : '') + ' / ' + Math.round(e);
-      r.send.disabled = board.pReserve < 1;
-      // swivel telegraph: flash the threatened section
-      const tel = board.swivelTarget && board.swivelTarget.section === i;
-      r.be.style.opacity = tel ? '0.45' : '0.85';
+    this.buildStations(board);
+    panel.style.display = 'flex';
+    $('btitle').textContent = 'BOARDING — ' + board.foe.name.toUpperCase();
+
+    // each station ring
+    for (const st of board.stations) {
+      const c = this.cards.get(st.id);
+      if (!c) continue;
+      const { frac, phase } = this.ringFor(st);
+      c.arc.style.strokeDashoffset = String(this.ringC * (1 - Math.max(0, Math.min(1, frac))));
+      c.el.className = 'bstation phase-' + phase;
+      // lines under an axe flash even while idle
+      if (st.id.startsWith('line')) {
+        const i = st.id === 'line0' ? 0 : st.id === 'line1' ? 1 : 2;
+        if (board.lineHealth[i] <= 0) c.el.classList.add('parted');
+        if (board.axe && board.axe.line === i) c.el.classList.add('axe');
+      }
+      c.sub.textContent = this.subFor(st, board);
     }
-    $('breserve').textContent =
-      'RESERVE ' + Math.round(board.pReserve) + ' · THEIRS ' + Math.round(board.eReserve);
-    ($('bswivel') as HTMLButtonElement).disabled = board.swivelCd > 0 || !!board.swivelTarget;
-    $('bswivel').textContent = board.swivelCd > 0 ? 'SWIVEL ' + board.swivelCd.toFixed(0) + 's' : 'SWIVEL (Q)';
-    $('bpress').classList.toggle('on', board.press);
+
+    // the front bar — drift in one glance, no numbers needed
+    const fr = (board.front + 1) / 2; // 0 = your deck, 1 = their quarterdeck
+    ($('bfrontmine') as HTMLElement).style.width = (fr * 100).toFixed(1) + '%';
+    ($('bfronttheirs') as HTMLElement).style.width = ((1 - fr) * 100).toFixed(1) + '%';
+    ($('bfrontmarker') as HTMLElement).style.left = (fr * 100).toFixed(1) + '%';
+    $('bmine').textContent = Math.round(board.myHands) + (board.reserve ? ' +' + board.reserve : '') + ' hands';
+    $('btheirs').textContent = Math.round(board.theirHands) + ' hands';
+
+    // enemy demand banner
+    const dem = $('bdemand');
+    if (board.surge) {
+      const k = Math.max(0, board.surge.t / BOARD_CFG.surge.patience);
+      dem.className = 'surge';
+      dem.innerHTML = '⚔ THEY MASS AT THE RAIL — answer with shot' +
+        `<div class="bpatience"><i style="width:${(k * 100).toFixed(0)}%"></i></div>`;
+    } else if (board.axe) {
+      const i = board.axe.line;
+      dem.className = 'axe';
+      dem.innerHTML = '🪓 AN AXE AT THE ' + LINE_NAMES[i] + ' — heave it taut';
+    } else if (board.pushT > 0) {
+      dem.className = 'surge';
+      dem.innerHTML = 'THEY HAVE THE RAIL — the front buckles';
+    } else {
+      dem.className = '';
+      dem.innerHTML = '';
+    }
+  }
+
+  /** Read a station's live phase for audio cue routing (main loop helper). */
+  stationPhase(board: BoardingState, id: StationId): string {
+    return boardStation(board, id)?.phase ?? 'idle';
   }
 
   /* ============ map mode ============ */
