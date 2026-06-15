@@ -11,7 +11,7 @@ import { Rng } from './rng';
 import type { EventQueue } from './events';
 import type { ArmadaEntry, RunState } from './types';
 import { EASY } from './easing';
-import { LOYALTY, clampLoyalty } from './captains';
+import { LOYALTY, clampLoyalty, legendById, legendQuirk } from './captains';
 
 export function newRun(): RunState {
   return {
@@ -36,6 +36,9 @@ export function newRun(): RunState {
     contracts: [],
     jobBoard: [],
     nextContractId: 1,
+    legendsHired: [],
+    portEvent: null,
+    lastPortEventKey: '',
   };
 }
 
@@ -304,11 +307,28 @@ export function carouse(run: RunState, idx: number): boolean {
 }
 
 /** Remove any consort whose morale has hit rock bottom — she sails off with
- *  her hull (and whatever was in it). Returns who left, for the feed/log. */
+ *  her hull (and whatever was in it). A 'steadfast' legend never leaves, no
+ *  matter how low you take her. Returns who left, for the feed/log. */
 export function desertionSweep(run: RunState): ArmadaEntry[] {
-  const gone = run.armada.filter((a) => a.loyalty <= LOYALTY.desertAt);
-  if (gone.length) run.armada = run.armada.filter((a) => a.loyalty > LOYALTY.desertAt);
+  const willDesert = (a: ArmadaEntry): boolean =>
+    a.loyalty <= LOYALTY.desertAt && legendQuirk(a.legend) !== 'steadfast';
+  const gone = run.armada.filter(willDesert);
+  if (gone.length) run.armada = run.armada.filter((a) => !willDesert(a));
   return gone;
+}
+
+/** Sign a legendary captain drinking at a port — she brings her own hull and
+ *  her own opinions, and can only be hired once per run. */
+export function recruitLegend(run: RunState, legendId: string): boolean {
+  const l = legendById(legendId);
+  if (!l || run.legendsHired.includes(l.id)) return false;
+  if (run.armada.length >= ARMADA_CAP || run.stores < l.cost) return false;
+  run.stores -= l.cost;
+  run.legendsHired.push(l.id);
+  run.armada.push({
+    cls: l.ship.cls, name: l.ship.name, captain: [l.name, l.doctrine], loyalty: l.startLoyalty, legend: l.id,
+  });
+  return true;
 }
 
 export function stripPrize(run: RunState, i: number): boolean {

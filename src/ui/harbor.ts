@@ -5,7 +5,7 @@ import { CLASSES, DOCTRINES, STRIP_LOOT, PRIZE_VALUE } from '../sim/constants';
 import * as runOps from '../sim/run';
 import type { RunState } from '../sim/types';
 import { Rng } from '../sim/rng';
-import { LOYALTY, TEMPERAMENT, bark, loyaltyBand, loyaltyWord } from '../sim/captains';
+import { LOYALTY, QUIRK_DESC, TEMPERAMENT, bark, legendById, loyaltyBand, loyaltyWord } from '../sim/captains';
 import { audio } from '../audio';
 import { $ } from './hud';
 
@@ -105,19 +105,26 @@ export class HarborScreen {
     } else {
       run.armada.forEach((a, ai) => {
         const t = TEMPERAMENT[a.captain[1]];
+        const leg = legendById(a.legend);
         const band = loyaltyBand(a.loyalty);
         const shortName = a.name.split(' ').slice(-1)[0];
         const card = document.createElement('div');
         card.className = 'hcard';
         card.innerHTML =
-          '<h3>' + CLASSES[a.cls].name.toUpperCase() + ' ' + shortName + ' — Capt. ' + a.captain[0] + '</h3>' +
-          '<div class="d">' + t.title + ' · ' + t.creed + '<br>' +
+          '<h3>' + (leg ? '★ ' : '') + CLASSES[a.cls].name.toUpperCase() + ' ' + shortName + ' — Capt. ' + a.captain[0] + '</h3>' +
+          '<div class="d">' + t.title +
+          (leg ? ' · <span style="color:var(--gold)">' + QUIRK_DESC[leg.quirk] + '</span>' : '') + '<br>' +
+          (leg ? leg.creed : t.creed) + '<br>' +
           '<span style="color:var(--parch)">Loves</span> ' + t.loves + '<br>' +
           '<span style="color:var(--parch)">Hates</span> ' + t.hates + '<br>' +
           '<div class="loybar"><i style="width:' + Math.round(a.loyalty) + '%;background:' +
           LOYALTY_COLOR[band] + '"></i></div>' +
           'Morale: <span style="color:' + LOYALTY_COLOR[band] + '">' + loyaltyWord(a.loyalty) + '</span>' +
-          (band === 'mutinous' ? ' — she is one bad day from sailing off' : '') +
+          (band === 'mutinous'
+            ? leg && leg.quirk === 'steadfast'
+              ? ' — and furious, but she holds fast all the same'
+              : ' — she is one bad day from sailing off'
+            : '') +
           '</div>';
         // share the plunder: spend stores to buy back goodwill
         const carouse = document.createElement('button');

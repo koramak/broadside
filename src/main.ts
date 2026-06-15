@@ -16,6 +16,7 @@ import type { EncounterSpec } from './sim/world';
 import { SceneShell } from './render/renderer';
 import { ShipView } from './render/shipView';
 import { Effects } from './render/effects';
+import { BoardingCrowd } from './render/boardingCrowd';
 import { ModelLibrary, PROP_MODEL_NAMES, SHIP_MODEL_NAMES } from './render/models';
 import { WorldView } from './render/worldView';
 import { Hud, $ } from './ui/hud';
@@ -27,11 +28,13 @@ import { audio, boom, setMusic, boardTick, boardFoul, woodHit, splash } from './
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 import { refreshRumors } from './sim/economy';
 import { deliverAtPort, generateBoard } from './sim/contracts';
+import { rollPortEvent } from './sim/portEvents';
 import { PORTS } from './sim/worldgen';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const shell = new SceneShell(canvas);
 const effects = new Effects(shell.scene);
+const crowd = new BoardingCrowd(shell.scene);
 const hud = new Hud();
 const harbor = new HarborScreen();
 const portScreen = new PortScreen();
@@ -128,6 +131,7 @@ function endBattleCleanup(): void {
   for (const sv of shipViews) sv.dispose(shell.scene);
   shipViews = [];
   effects.clearTransient();
+  crowd.hide();
   hud.syncBoarding(null);
   battle = null;
 }
@@ -294,12 +298,15 @@ portScreen.onFeed = (m) => {
 function enterPort(port: NonNullable<World['canDock']>): void {
   mode = 'port';
   if (world) {
-    onDocked(run, port.id, world.events);
+    const w = world; // bind for closures below (TS won't narrow the captured field)
+    onDocked(run, port.id, w.events);
     // the tavern talks the moment you tie up
-    refreshRumors(run, PORTS, port.id, world.day);
+    refreshRumors(run, PORTS, port.id, w.day);
     // settle any cargo contracts that end here, then post fresh work
-    deliverAtPort(run, port.id, world.day, world.events);
-    run.jobBoard = generateBoard(run, port, world.day);
+    deliverAtPort(run, port.id, w.day, w.events);
+    run.jobBoard = generateBoard(run, port, w.day);
+    // whatever drama greets you at the quay (passive effects apply now)
+    rollPortEvent(run, port, w.day, (m) => w.events.feed(m));
     // pool hands walk aboard free — replenishing crew at port is automatic
     const before = run.pool;
     if (topUpCrew(run)) {
@@ -490,6 +497,9 @@ function frame(now: number): void {
     shell.follow(p.x, p.y, dtReal);
     shell.updateEnvironment(simTime, battle.wind.dir, paused);
     for (const sv of shipViews) sv.update(sv.ship === p, simTime);
+    // the deck fight: a shoving crowd at the rail seam while boarding
+    if (battle.phase === 'board' && battle.board) crowd.update(p, battle.board.foe, battle.board, simTime);
+    else crowd.hide();
     effects.syncBalls(battle.balls, simTime);
     effects.update(paused ? 0 : dtReal);
     hud.sync(battle, paused);

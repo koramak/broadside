@@ -2,6 +2,7 @@ import type { Captain, DoctrineKey, RefitKey, ShipClass } from './constants';
 import type { GoodKey } from './economy';
 import type { FactionKey } from './worldgen';
 import type { Contract } from './contracts';
+import type { PortEventView } from './portEvents';
 
 export type Team = 'p' | 'e';
 
@@ -47,6 +48,8 @@ export interface Ship {
    *  entry at battle start, drifts during the fight, written back at its end.
    *  undefined for the flagship and all enemies. */
   loyalty?: number;
+  /** legendary-captain id for a recruited consort (drives her quirk in battle) */
+  legend?: string;
 }
 
 export interface Ball {
@@ -93,6 +96,9 @@ export interface ArmadaEntry {
   /** 0..100 morale. High → fights harder, obeys instantly. Low → hesitates,
    *  ignores orders. Rock-bottom → she sails off with the hull. See captains.ts. */
   loyalty: number;
+  /** legendary-captain id, if this consort is a recruited legend (her quirk +
+   *  personal voice come from captains.LEGENDS). undefined for ordinary hands. */
+  legend?: string;
 }
 
 export interface Prize {
@@ -142,4 +148,10 @@ export interface RunState {
   jobBoard: Contract[];
   /** monotonic id source for contracts (ties a bounty to its quarry) */
   nextContractId: number;
+  /** legendary captains already signed on this run (each recruitable once) */
+  legendsHired: string[];
+  /** the event that greeted you at the port you're docked in (null = none) */
+  portEvent: PortEventView | null;
+  /** "<portId>:<day>" of the last rolled port event — stops same-day re-rolls */
+  lastPortEventKey: string;
 }

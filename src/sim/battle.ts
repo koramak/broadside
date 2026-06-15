@@ -23,7 +23,7 @@ import { applyKillRep, flagStats, rollPrizeLog, topUpCrew } from './run';
 import { GOODS, cargoLoad, fleetCargoCap } from './economy';
 import { EASY } from './easing';
 import {
-  LOYALTY, bark, clampLoyalty, loyaltyBand, loyaltyEffect, orderReaction, tacticalContent,
+  LOYALTY, bark, clampLoyalty, legendQuirk, loyaltyBand, loyaltyEffect, orderReaction, tacticalContent,
 } from './captains';
 import type { BarkKey } from './captains';
 
@@ -131,6 +131,12 @@ export class Battle {
       s.doctrine = a.captain[1];
       s.name = a.name;
       s.loyalty = a.loyalty; // her morale rides into the fight, drifts, rides back out
+      s.legend = a.legend;
+      // ironhide: her hull is built to be hit
+      if (legendQuirk(a.legend) === 'ironhide') {
+        s.maxHull = Math.round(s.maxHull * 1.3);
+        s.hull = s.maxHull;
+      }
       this.ships.push(s);
     });
 
@@ -230,8 +236,14 @@ export class Battle {
     }
     let crewFac = 0.55 + 0.45 * (s.crew / s.maxCrew);
     if (s.gauge) crewFac *= 1.12;
-    // a consort's morale shows in her gun crew's pace (lower reloadMul = faster)
-    if (s.loyalty !== undefined) crewFac /= loyaltyEffect(s.loyalty).reloadMul;
+    // a consort's morale shows in her gun crew's pace (lower reloadMul = faster);
+    // a deadeye's crews keep the devoted pace whatever her mood
+    if (s.loyalty !== undefined) {
+      const rl = legendQuirk(s.legend) === 'deadeye'
+        ? Math.min(loyaltyEffect(s.loyalty).reloadMul, 0.88)
+        : loyaltyEffect(s.loyalty).reloadMul;
+      crewFac /= rl;
+    }
     for (let i = 0; i < 2; i++) s.reload[i] = Math.max(0, s.reload[i] - dt * crewFac);
     s.wakeT -= dt;
     if (s.speed > 15 && s.wakeT <= 0) {
@@ -436,8 +448,11 @@ export class Battle {
     } else {
       s.ammo = 0;
     }
-    // devoted crews fire eagerly; mutinous ones drag their feet
-    const fireRate = dt * 6 * (eff ? eff.fireMul : 1);
+    // devoted crews fire eagerly; mutinous ones drag their feet; a deadeye
+    // never lets the rate fall below devoted
+    let fireMul = eff ? eff.fireMul : 1;
+    if (eff && legendQuirk(s.legend) === 'deadeye') fireMul = Math.max(fireMul, 1.25);
+    const fireRate = dt * 6 * fireMul;
     for (let side = 0; side < 2; side++) {
       if (s.reload[side] <= 0 && s.gunsLeft[side] > 0 && this.inArc(s, foe, side) && rng.random() < fireRate) {
         this.fire(s, side);
@@ -452,6 +467,8 @@ export class Battle {
    *  (so desertion is always telegraphed, never a surprise). */
   private adjustLoyalty(s: Ship, delta: number, key?: BarkKey): void {
     if (s.loyalty === undefined || !s.captain) return;
+    // a steadfast legend's faith only erodes half as fast
+    if (delta < 0 && legendQuirk(s.legend) === 'steadfast') delta *= 0.5;
     const before = loyaltyBand(s.loyalty);
     s.loyalty = clampLoyalty(s.loyalty + delta);
     const after = loyaltyBand(s.loyalty);
@@ -796,8 +813,12 @@ export class Battle {
     run.armada = survivors.map((s) => {
       let loy = (s.loyalty ?? LOYALTY.start) + LOYALTY.victory;
       if (s.hull < s.maxHull * 0.25) loy += s.doctrine === 'bulldog' ? LOYALTY.bulldogMauled : LOYALTY.mauled;
-      if (s.doctrine === 'corsair') loy += prizesTaken > 0 ? LOYALTY.corsairPrize : onlySunk ? LOYALTY.corsairWaste : 0;
-      return { cls: s.cls, name: s.name, captain: s.captain!, loyalty: clampLoyalty(loy) };
+      if (s.doctrine === 'corsair') {
+        // a bloodthirsty legend feels prizes and waste twice as keenly
+        const k = legendQuirk(s.legend) === 'bloodthirsty' ? 2 : 1;
+        loy += (prizesTaken > 0 ? LOYALTY.corsairPrize : onlySunk ? LOYALTY.corsairWaste : 0) * k;
+      }
+      return { cls: s.cls, name: s.name, captain: s.captain!, loyalty: clampLoyalty(loy), legend: s.legend };
     });
     // one survivor crows — but a Corsair only brags of a prize if one was taken
     const speakers = prizesTaken > 0 ? survivors : survivors.filter((s) => s.doctrine !== 'corsair');

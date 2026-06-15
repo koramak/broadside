@@ -6,6 +6,9 @@ import { GOODS, cargoLoad, fleetCargoCap, priceAt } from '../sim/economy';
 import * as runOps from '../sim/run';
 import type { RunState } from '../sim/types';
 import { MAX_ACTIVE, acceptContract, daysLeft } from '../sim/contracts';
+import { QUIRK_DESC, TEMPERAMENT, bark, legendAtPort } from '../sim/captains';
+import { resolvePortEventChoice } from '../sim/portEvents';
+import { Rng } from '../sim/rng';
 import { FACTIONS, PORTS } from '../sim/worldgen';
 import type { PortDef } from '../sim/worldgen';
 import { audio } from '../audio';
@@ -40,6 +43,30 @@ export class PortScreen {
     $('pmeta').textContent = faction.name + ' · standing ' + rep + ' · ' + mood;
     $('pstores2').textContent =
       'STORES: ' + run.stores + ' · HOLD: ' + cargoLoad(run) + '/' + fleetCargoCap(run) + ' · SPARE HANDS: ' + run.pool;
+
+    // the drama that greeted you at the quay (rolled in main on docking)
+    const ev = $('pevent');
+    if (run.portEvent) {
+      const e = run.portEvent;
+      ev.className = 'hcard wide';
+      ev.style.display = 'block';
+      ev.innerHTML = '<h3 style="color:var(--gold)">' + e.title + '</h3><div class="d">' + e.text + '</div>';
+      for (const ch of e.choices ?? []) {
+        const btn = document.createElement('button');
+        btn.textContent = ch.label;
+        btn.disabled = ch.key === 'bribe' && run.stores < 8;
+        btn.addEventListener('click', () => {
+          audio();
+          resolvePortEventChoice(run, port, e.id, ch.key, this.onFeed);
+          this.onShipChanged();
+          this.render(run, day);
+        });
+        ev.appendChild(btn);
+      }
+    } else {
+      ev.style.display = 'none';
+      ev.innerHTML = '';
+    }
 
     // market
     const seed = PORTS.indexOf(port);
@@ -136,6 +163,36 @@ export class PortScreen {
           run.rumors.map((r) => '«' + r.text + '»').join('<br>') +
           '</div>'
         : '');
+
+    // a legendary captain ashore — recruit her and her hull (once per run)
+    const leg = legendAtPort(run, port, day);
+    if (leg) {
+      const lt = TEMPERAMENT[leg.doctrine];
+      const lcard = document.createElement('div');
+      lcard.innerHTML =
+        '<h3 style="margin-top:12px;color:var(--gold)">★ A CAPTAIN IN THE TAVERN</h3>' +
+        '<div class="d"><b style="color:var(--parch)">' + leg.name + '</b> · ' + lt.title + '<br>' +
+        leg.creed + '<br>Sails the ' + leg.ship.name + '.<br>' +
+        '<span style="color:var(--gold)">Knack:</span> ' + QUIRK_DESC[leg.quirk] + '</div>';
+      const full = run.armada.length >= runOps.ARMADA_CAP;
+      const lbtn = document.createElement('button');
+      lbtn.textContent = full
+        ? 'RECRUIT — your armada is full (' + runOps.ARMADA_CAP + '/' + runOps.ARMADA_CAP + ')'
+        : 'RECRUIT — ' + leg.cost + ' stores';
+      lbtn.disabled = full || run.stores < leg.cost;
+      lbtn.addEventListener('click', () => {
+        audio();
+        if (runOps.recruitLegend(run, leg.id)) {
+          const rng = new Rng(day * 131 + PORTS.indexOf(port) + 3);
+          const line = bark([leg.name, leg.doctrine], 'recruit', rng, leg.id);
+          if (line) this.onFeed(line);
+          this.onShipChanged();
+        }
+        this.render(run, day);
+      });
+      tv.appendChild(lcard);
+      tv.appendChild(lbtn);
+    }
 
     // the job board — faction work that turns the whole map into content
     const bd = $('pboard');

@@ -78,7 +78,7 @@ export class Hud {
         : '';
       const c = document.createElement('div');
       c.className = 'chip';
-      c.innerHTML = `<button data-h="${i}">HELM</button><div class="nm">${s.name}</div>
+      c.innerHTML = `<button data-h="${i}">HELM</button><div class="nm">${s.legend ? '★ ' : ''}${s.name}</div>
         <div class="tr">Capt. ${s.captain ? s.captain[0] : '—'} · ${docShort}${mood}</div>
         <div class="bar hull"><i></i></div>`;
       f.appendChild(c);

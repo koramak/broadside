@@ -9,8 +9,11 @@
 // This is also the home for the Disco-Elysium voice: captains with opinions,
 // barked in character. ZERO Three.js, all FEEL constants live here.
 
-import type { Captain, DoctrineKey } from './constants';
-import type { Rng } from './rng';
+import type { Captain, DoctrineKey, ShipClass } from './constants';
+import { Rng } from './rng';
+import { PORTS } from './worldgen';
+import type { FactionKey, PortDef } from './worldgen';
+import type { RunState } from './types';
 
 /* ============ loyalty model (FEEL dials) ============ */
 
@@ -258,11 +261,13 @@ function surname(captain: Captain): string {
   return captain[0];
 }
 
-/** Pick an in-character line for this captain at this moment. Returns null if
+/** Pick an in-character line for this captain at this moment. A legend's own
+ *  lines take precedence over her temperament's; she falls back to the
+ *  temperament for any moment she has nothing personal to say. Returns null if
  *  there's nothing to say (so callers can stay quiet). Deterministic via rng. */
-export function bark(captain: Captain, key: BarkKey, rng: Rng): string | null {
-  const t = TEMPERAMENT[captain[1]];
-  const lines = t?.barks[key];
+export function bark(captain: Captain, key: BarkKey, rng: Rng, legendId?: string): string | null {
+  const legend = legendById(legendId);
+  const lines = legend?.barks?.[key] ?? TEMPERAMENT[captain[1]]?.barks[key];
   if (!lines || !lines.length) return null;
   const line = lines[rng.int(lines.length)];
   return line.replace(/\{n\}/g, surname(captain));
@@ -306,4 +311,109 @@ export function tacticalContent(
   if (range > 110 && range < 240) return 1; // hanging off the quarter, hunting
   if (range > 360) return -1; // lost the scent
   return 0;
+}
+
+/* ============ legendary captains: named characters you can recruit ============ */
+
+// Each is a person with her own creed and a QUIRK that bends one rule a little
+// — the captain-level flavor of "realism that earns its magic". They bring
+// their own signature hull and frequent the ports of one flag.
+export type LegendQuirk = 'steadfast' | 'deadeye' | 'ironhide' | 'bloodthirsty';
+
+export const QUIRK_DESC: Record<LegendQuirk, string> = {
+  steadfast: 'she will never abandon your flag',
+  deadeye: 'her gun crews never lose their pace',
+  ironhide: 'her hull is built to be hit',
+  bloodthirsty: 'morale soars on prizes, sours when idle',
+};
+
+export interface Legend {
+  id: string;
+  name: string;
+  doctrine: DoctrineKey;
+  /** personal creed, shown on her card in place of the temperament's */
+  creed: string;
+  ship: { cls: ShipClass; name: string };
+  cost: number;
+  quirk: LegendQuirk;
+  /** which flag's ports she drinks in */
+  affinity: FactionKey;
+  startLoyalty: number;
+  /** personal lines layered over her temperament (any subset of moments) */
+  barks?: Partial<Record<BarkKey, string[]>>;
+}
+
+export const LEGENDS: Legend[] = [
+  {
+    id: 'varga', name: 'Inez Varga', doctrine: 'surgeon', quirk: 'deadeye',
+    creed: '“I have buried better captains than you for less. Stand off, and I’ll make their mistakes look like weather.”',
+    ship: { cls: 'brig', name: 'Brig Mercy’s Lien' }, cost: 95, affinity: 'compania', startLoyalty: 72,
+    barks: {
+      recruit: ['Inez Varga reads your ledger of dead and exhales. “Fine. Someone has to keep you alive.”'],
+      victory: ['Varga wipes her hands. “Adequate. I’ve watched adequate curdle into legend. Don’t let it.”'],
+    },
+  },
+  {
+    id: 'halloran', name: 'Grin Halloran', doctrine: 'bulldog', quirk: 'ironhide',
+    creed: '“Hit me. Go on. I’ll be over here, not noticing.”',
+    ship: { cls: 'brig', name: 'Brig The Glutton' }, cost: 88, affinity: 'brethren', startLoyalty: 70,
+    barks: {
+      recruit: ['Grin Halloran cracks his knuckles one at a time. “Heard you start fights you can’t finish. I finish them.”'],
+      approve: ['Halloran takes a broadside grinning. “Is that ALL?”'],
+    },
+  },
+  {
+    id: 'maro', name: 'Salt-Tongue Maro', doctrine: 'corsair', quirk: 'bloodthirsty',
+    creed: '“Every hull afloat owes me. I am simply… aggressive about accounts receivable.”',
+    ship: { cls: 'sloop', name: 'Sloop Tithe' }, cost: 56, affinity: 'brethren', startLoyalty: 62,
+    barks: {
+      recruit: ['Salt-Tongue Maro counts your masts like coins. “Lead me to the fat ones. I’ll forgive the rest. Once.”'],
+      mutinous: ['Maro’s hold echoes and so does her patience. “Fill it or I find a captain who will.”'],
+    },
+  },
+  {
+    id: 'pell', name: 'One-Glass Pell', doctrine: 'surgeon', quirk: 'steadfast',
+    creed: '“One glass of rum a night, one opinion: stay the course. I will not leave it. Or you.”',
+    ship: { cls: 'frigate', name: 'Frigate The Long Patience' }, cost: 118, affinity: 'crown', startLoyalty: 74,
+    barks: {
+      recruit: ['One-Glass Pell shakes your hand exactly once. “I don’t change ships. Disappoint me anyway, and learn what loyalty without warmth looks like.”'],
+    },
+  },
+  {
+    id: 'esquival', name: 'Red Esquival', doctrine: 'bulldog', quirk: 'steadfast',
+    creed: '“I picked a side the day they hanged my brother. It’s yours now, for reasons that are none of your business.”',
+    ship: { cls: 'brig', name: 'Brig Vendetta' }, cost: 84, affinity: 'brethren', startLoyalty: 76,
+    barks: {
+      recruit: ['Red Esquival doesn’t smile. “I don’t leave. Ask the Crown how that’s gone for them.”'],
+    },
+  },
+  {
+    id: 'dauphine', name: 'Dauphine the Lesser', doctrine: 'corsair', quirk: 'deadeye',
+    creed: '“They call me the Lesser. They are wrong about the direction.”',
+    ship: { cls: 'sloop', name: 'Sloop Lesser Evil' }, cost: 62, affinity: 'compania', startLoyalty: 66,
+    barks: {
+      recruit: ['Dauphine the Lesser appraises your fleet. “You’ll do. Briefly. Brilliantly. Try to keep up.”'],
+    },
+  },
+];
+
+export function legendById(id?: string): Legend | undefined {
+  return id ? LEGENDS.find((l) => l.id === id) : undefined;
+}
+
+export function legendQuirk(id?: string): LegendQuirk | undefined {
+  return legendById(id)?.quirk;
+}
+
+/**
+ * The legendary captain (if any) drinking at this port today — deterministic
+ * per port + day, drawn from those who haven't signed on yet and whose flag
+ * this is. She isn't always ashore; that's what makes finding her a moment.
+ */
+export function legendAtPort(run: RunState, port: PortDef, day: number): Legend | null {
+  const eligible = LEGENDS.filter((l) => !run.legendsHired.includes(l.id) && l.affinity === port.faction);
+  if (!eligible.length) return null;
+  const rng = new Rng((PORTS.indexOf(port) + 1) * 5779 + day * 3331 + 7);
+  if (rng.random() > 0.45) return null; // not every visit
+  return eligible[rng.int(eligible.length)];
 }
