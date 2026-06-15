@@ -4,7 +4,7 @@ Companion to CLAUDE.md (which holds locked canon + the file map / how-to-run).
 This file tracks what's actually built, what's in flight, and what's undecided.
 Keep it honest: describe what the code does, not what it's meant to do.
 
-_Last updated: 2026-06-13, end of the "armada as characters / job board / trade-up" batch. Working tree clean; everything below is committed (push to deploy)._
+_Last updated: 2026-06-15, end of the "legends / port events / melee crowds" batch. Working tree clean; everything below is committed + deployed._
 
 ## System status
 
@@ -17,6 +17,9 @@ _Last updated: 2026-06-13, end of the "armada as characters / job board / trade-
 | Consort captains as characters (temperament + loyalty + voice) | **working** | `captains.ts`. Each consort has a doctrine-borne TEMPERAMENT (creed/loves/hates) and a LOYALTY that drifts with use: orders for/against type, signal use, a contentment sample, battle-end verdict. High → fights harder + obeys instantly; mutinous → refuses signals, ignores form-up, deserts (≤6) with her hull. CAROUSE buys goodwill back. Disco-Elysium barks in the feed; mood on chips + harbor cards. |
 | Flagship trade-up (HOIST YOUR FLAG) | **working** | `run.hoistFlag`. Any prize can become your flagship; crew + refits carry, she comes worn (hull 60%), old hull sold for prize value. Chart ship + mesh rebuild on class change. The Plate Ship is now sailable. |
 | Tavern contracts & bounties (job board) | **working** | `contracts.ts`. Per-port board (faction-shaped): delivery, smuggle (draws Crown hunters + rep swing), bounty (named quarry spawns + hunts). Deadlines on the day clock; lapse costs standing. Active articles on port/chart HUD + cyan dest marks. Escort NOT yet shipped (needs friendly-NPC protection AI). |
+| Legendary recruitable captains | **working** | `captains.ts` LEGENDS (6). Named characters with personal creed + signature hull + a QUIRK (steadfast/deadeye/ironhide/bloodthirsty), drinking in their flag's ports (deterministic per port+day), hired once each via the tavern. Personal barks over the temperament voice; ★ on cards/chips. |
+| Port events | **working** | `portEvents.ts`. Banner on docking (≈55%, deterministic per port+day, same-day re-roll guarded): passive (press-gang, fire, fever, festival, debt, rot) + choices (customs bribe/open, dockside duel, stowaway). Contraband makes customs bite. |
+| Boarding melee crowds | **working** | `render/boardingCrowd.ts`. Instanced miniature crew at the rail seam, gold vs rust, boundary slides with `board.front`, density tracks hand counts. The deferred "wow", now shipped. |
 | 6-action story → Plate Ship → 3 Mist actions → THE HARROW | **working** | `worldgen.ESCALATION` (locked) + Mist waves. Ghosts ignore the wind curve (the one shipped rule-breaker). |
 | Sea map (real-time wind sailing, contacts flee/hunt/lane, pursuit give-up, crates) | **working** | `world.ts`. Mortals won't enter the Mist; ghosts won't leave it. |
 | Trading economy (6 goods, port bias, day wobble) | **working** | `economy.ts`. Sinking now also drops floating cargo + rescued men. |
@@ -30,8 +33,8 @@ _Last updated: 2026-06-13, end of the "armada as characters / job board / trade-
 | Easing / "Fair Winds & Mercy" | **working** | `easing.ts`, pause-menu toggle. 20%-kinder testing layer; off = prototype-true. |
 
 ### Partial / deferred
-- **Boarding presentation** — the deck fight runs on HTML station rings + camera glide + the two lashed hull meshes. The spec's **miniature melee crowds at the rail seam** (gold sashes vs rust, a visible shoving front) are **not rendered yet**. Biggest remaining "wow" for the scene.
 - **Combat SFX samples** — synthesis only. A drop-in slot exists at `public/assets/sfx/` (`cannon.mp3`/`hit.mp3`/`splash.mp3`) that layers automatically, but no files are bundled — sourcing verified-CC0 cannon by direct fetch was unreliable. Synth is the shipped default.
+- **Boarding crowds** are rendered now (above), but they're simple pegs (no separate heads, no animation beyond bob/jostle). Good enough; could be enriched later.
 
 ### Nothing currently broken.
 
@@ -54,20 +57,26 @@ The mechanic, as built: tap a station → ring fills white (prime) → **gold wi
 - **Fog-of-war for normal ports** — decided AGAINST for now (all open ports visible from the start; logs reveal only the *secret* ones). Revisit later if discovery should bite harder.
 
 ## Immediate next feature
-The three top brainstorm picks all shipped in the 2026-06-13 batch (consort
-captains, contracts/bounties, flagship trade-up). All are TUNING-open, not
-design-open — playtest verdicts wanted on:
-- **Loyalty cadence** — does the slow drift make desertion feel earned, or too
-  rare / too punishing? `LOYALTY` dials in `captains.ts`. Desert threshold 6.
+Six features shipped across two 2026 batches (consort captains, contracts/
+bounties, flagship trade-up, legendary captains, port events, boarding crowds).
+All TUNING-open, not design-open — playtest verdicts wanted on:
+- **Loyalty cadence** — does the slow drift make desertion feel earned? `LOYALTY`
+  dials in `captains.ts`. Desert threshold 6.
 - **Contract economy** — delivery payouts (×1.7 of base) and deadlines; whether
   the smuggle "blockade" (hunter chance ×0.5) bites. Dials in `contracts.ts`.
-- **Trade-up condition** — hoisted hull starts at 60%; is selling the old flag
-  the right call vs keeping her as a consort? (`HOIST_HULL_PCT` / `hoistFlag`.)
+- **Trade-up condition** — hoisted hull starts at 60%; sell old flag vs keep as
+  consort? (`HOIST_HULL_PCT` / `hoistFlag`.)
+- **Legend balance** — quirk strengths + hire costs (55–118) + the 45% per-visit
+  presence roll. `LEGENDS` in `captains.ts`.
+- **Port-event frequency/severity** — the 55% roll + per-event weights/amounts in
+  `portEvents.ts`.
 
 Next from the backlog (human to pick): **escort contracts** (the one contract
-type deferred — needs a friendly NPC that paths to a port and can be attacked);
-the **boarding melee crowds** (deferred presentation piece); spyglass enemy-
-intel; boarding-assist consort order; mid-battle wind shifts; crew-quality refit
-(the `surgeonsMate` hook in boardingConfig is reserved for this); port events;
-price impact from your own trades; meta-progression between runs; branching
-route map; legendary recruitable rival captains; weather/day-night, screen-shake.
+type still deferred — needs a friendly NPC that paths to a port and can be
+attacked); spyglass enemy-intel; boarding-assist consort order; mid-battle wind
+shifts; crew-quality refit (the `surgeonsMate` hook in boardingConfig is reserved
+for this); price impact from your own trades; notoriety-driven navy hunts/
+blockades; meta-progression between runs; branching route map; weather/day-night;
+screen-shake & juice; richer boarding-crowd figures; combat SFX samples (asset
+sourcing). Design-gated (need the human): player-ownable rule-breaker ships; the
+title.
