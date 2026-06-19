@@ -4,14 +4,14 @@ Companion to CLAUDE.md (which holds locked canon + the file map / how-to-run).
 This file tracks what's actually built, what's in flight, and what's undecided.
 Keep it honest: describe what the code does, not what it's meant to do.
 
-_Last updated: 2026-06-15, end of the "legends / port events / melee crowds" batch. Working tree clean; everything below is committed + deployed._
+_Last updated: 2026-06-18, end of the "playtest-feedback fixes" batch (ledger→log + active missions, salvage chart marks, enemy crew bar, contract-paid toast + chime, boarding early-tap foul). Working tree clean; everything below is committed + deployed._
 
 ## System status
 
 | System | State | Notes |
 |---|---|---|
 | Wind / sailing physics | **working** | `physics.ts`, shared by battle + map. Locked point-of-sail curve; committed turning; pace amp ×1.15 spd / ×1.2 turn (permanent); rowing floor ROW_EFF 0.075 ≈ 1.5× dead-into-wind. |
-| Gunnery (straddle aim, ammo, rake, subsystems, weather gauge) | **working** | Ported from the slice, constants in `constants.ts`. Pause-menu dials (ball speed / reload / rake) live in `tuning.ts`. |
+| Gunnery (straddle aim, ammo, rake, subsystems, weather gauge) | **working** | Ported from the slice, constants in `constants.ts`. Pause-menu dials (ball speed / reload / rake) live in `tuning.ts`. Fleet/enemy chips now carry a **crew bar + live hand-count** under the hull bar, so grape attrition reads at a glance. |
 | Enemy AI (Bulldog/Surgeon/Corsair doctrines) | **working** | In `battle.ts`. Corsair stern-rake hunting is the skill check. |
 | Armada (2 consorts, signal gun, engage/form-on-me, possession) | **working** | Cap stays 2. `replaceConsort` swaps when full (pay one off for ½ value). Consorts also sail the chart in formation. |
 | Consort captains as characters (temperament + loyalty + voice) | **working** | `captains.ts`. Each consort has a doctrine-borne TEMPERAMENT (creed/loves/hates) and a LOYALTY that drifts with use: orders for/against type, signal use, a contentment sample, battle-end verdict. High → fights harder + obeys instantly; mutinous → refuses signals, ignores form-up, deserts (≤6) with her hull. CAROUSE buys goodwill back. Disco-Elysium barks in the feed; mood on chips + harbor cards. |
@@ -25,11 +25,11 @@ _Last updated: 2026-06-15, end of the "legends / port events / melee crowds" bat
 | Trading economy (6 goods, port bias, day wobble) | **working** | `economy.ts`. Sinking now also drops floating cargo + rescued men. |
 | Factions + reputation | **working** | 3 factions; rep starts crown −10 / compañía 0 / brethren 15; `applyKillRep` moves it (sink ≈ 2× take; Brethren admire no-quarter, Crown abhors it); ports lock out at ≤ −50. |
 | Tutorial (guided fight→port→fight chain + favorable tutorial wind) | **working** | `objectives.ts`. Wind rig is EASY-gated. |
-| Ship's logs / discovery | **working** | `rollPrizeLog` on take (55% price tip / 30% shipwreck site / 15% secret port); fragment on sink. 2 secret ports hidden until charted. |
-| Captain's Log journal (L) | **working** | Dismissable rumors (✕), Discoveries, persistent Chronicle of every feed line. |
+| Ship's logs / discovery | **working** | `rollPrizeLog` on take (55% price tip / 30% shipwreck site / 15% secret port); fragment on sink. 2 secret ports hidden until charted. A logged wreck now drops a persistent **⚓ salvage mark** (`run.salvageMarks`) on the minimap, the big chart, and as a ring on the 3D sea; it clears once its crate cluster is gathered (`world.pruneSalvageMarks`) — the "a salvage site is on your chart" promise is now real (was logged but never drawn). |
+| Captain's Log journal (L) | **working** | Now the single home for the old left-hand ledger: **SHIP'S LEDGER** (stores/hold/cargo) + **ACTIVE ARTICLES** (contracts — what to carry, where, days left, payout) + **STANDING** (faction rep), alongside dismissable rumors (✕), Discoveries, and the persistent Chronicle. The persistent left-side `#cargo`/`#rep` panels were removed (decluttered map view). Contract completion now also fires a prominent center **toast + chime** so you can't miss being paid. |
 | Big chart (M / click minimap) + port nameplates | **working** | Names live on the big map only; minimap stays nameless; nameplates fade in within ~900u. |
 | Diorama render (oblique cam, GPU sea, Kenney kit, damage materials, ×2 ship scale) | **working** | `render/`. Boarding camera glides in (focus blend). |
-| Audio | **working (synth only)** | Procedural cannon/hit/splash + per-station boarding ticks + 2 CC0 music tracks. Real SFX **slot empty** — see Partial below. |
+| Audio | **working (synth only)** | Procedural cannon + **distinct hit (woody crack `woodHit`) vs miss (splash)** + per-station boarding ticks + a reward **`chime`** (contracts paid) + 2 CC0 music tracks. Real SFX **slot empty** — see Partial below. |
 | Easing / "Fair Winds & Mercy" | **working** | `easing.ts`, pause-menu toggle. 20%-kinder testing layer; off = prototype-true. |
 
 ### Partial / deferred
@@ -42,7 +42,7 @@ _Last updated: 2026-06-15, end of the "legends / port events / melee crowds" bat
 
 Boarding is **LOCKED as the tap-timing station game** (the only variant in the build; the deck-push / crew-stream / grid-tactics prototypes were rejected). Implementation: `sim/boarding.ts`, every constant in `sim/boardingConfig.ts` (exposed on `window.__broadside`).
 
-The mechanic, as built: tap a station → ring fills white (prime) → **gold window** → tap inside to land it → miss → red **foul** (dead time). A continuous melee underneath drifts the **front** toward whoever's stronger; win by pushing the front through their quarterdeck or breaking them below 12% crew. Stations: swivel (+2nd if GUNS refit), pistols, 3 lines (fray, can PART → long re-rig; all 3 parted = stranded), surgeon (bleed-out queue), reserve (commits all, locks helm), helm (cut & run). Enemy demands: SURGE (patience bar, fed by any swivel/pistol hit) and AXE (one line frays fast). Naval hooks all wired: rake-recently slows enemy cadence, weather gauge widens windows, TIMBERS slows fray, GUNS adds a swivel.
+The mechanic, as built: tap a station → ring fills white (prime) → **gold window** → tap inside to land it → miss → red **foul** (dead time). A continuous melee underneath drifts the **front** toward whoever's stronger; win by pushing the front through their quarterdeck or breaking them below 12% crew. Stations: swivel (+2nd if GUNS refit), pistols, 3 lines (fray, can PART → long re-rig; all 3 parted = stranded), surgeon (bleed-out queue), reserve (commits all, locks helm), helm (cut & run). Enemy demands: SURGE (patience bar, fed by any swivel/pistol hit) and AXE (one line frays fast). Naval hooks all wired: rake-recently slows enemy cadence, weather gauge widens windows, TIMBERS slows fray, GUNS adds a swivel. **(2026-06-18 FEEL)** tapping during the white prime — too early, before the gold window — now FOULS the station (red dead time), so jumping the gun is punished instead of ignored; behind the `earlyTapFouls` dial in `boardingConfig.ts`.
 
 **What's unsettled = TUNING, not design.** The spec targets 45–90s fights; the human is playtesting whether that holds and whether **outnumbered feels tense from second one**. Key deviation already made (in `boardingConfig.ts`, human-confirmed): spec's `FRONT_K 0.045` forced a ~22s skilled-play floor that fought the spec's own length target, so it's tuned to **0.024**; `attritionScale` 0.1; station kill amounts trimmed below spec so a lone sloop isn't gutted in two volleys. The `4d-tapping.html` reference was never committed, so the spec text + feel are the source of truth (no file to fidelity-check against).
 

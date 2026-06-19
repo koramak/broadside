@@ -131,6 +131,15 @@ export class World {
     run.shipwrecks = [];
   }
 
+  /** Drop charted salvage marks once their crate cluster has been gathered, so
+   *  the chart only shows sites that still hold cargo. */
+  pruneSalvageMarks(run: RunState): void {
+    if (!run.salvageMarks.length) return;
+    run.salvageMarks = run.salvageMarks.filter((m) =>
+      this.crates.some((c) => !c.taken && Math.hypot(c.x - m.x, c.y - m.y) < 160),
+    );
+  }
+
   /** Rebuild chart escorts when the armada roster changes. */
   private syncConsorts(run: RunState): void {
     const want = run.armada;

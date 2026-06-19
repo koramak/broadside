@@ -16,7 +16,8 @@ export type SimEvent =
   | { kind: 'battleWon' }
   | { kind: 'runOver'; title: string; text: string }
   | { kind: 'shipSunk'; ship: Ship }
-  | { kind: 'shipStruck'; ship: Ship };
+  | { kind: 'shipStruck'; ship: Ship }
+  | { kind: 'toast'; title: string; sub: string; tone: 'gold' | 'rust' }; // a prominent confirmation banner
 
 export class EventQueue {
   events: SimEvent[] = [];

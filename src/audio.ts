@@ -254,6 +254,27 @@ export function woodHit(vol = 0.4): void {
   src.start();
 }
 
+/** A reward earned — a bright two-note bell (contracts paid, prizes claimed). */
+export function chime(): void {
+  if (!AC) return;
+  const ac = AC;
+  const t = ac.currentTime;
+  [880, 1318.5].forEach((freq, i) => {
+    const o = ac.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = freq;
+    const g = ac.createGain();
+    const t0 = t + i * 0.09;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+    o.connect(g);
+    g.connect(ac.destination);
+    o.start(t0);
+    o.stop(t0 + 0.55);
+  });
+}
+
 /** A ball finds only sea — a wet plume. */
 export function splash(vol = 0.3): void {
   if (!AC) return;

@@ -59,4 +59,5 @@ export const BOARD_CFG = {
   /* global FEEL dials (pause menu) */
   windowScale: 1, // FORGIVING 1.25 / CANON 1 / CRUEL 0.8
   paceScale: 1, // CALM 0.85 / CANON 1 / FRENZY 1.2 — scales timers + melee
+  earlyTapFouls: true, // tap during the white fill (before the gold window) and the station FOULS — patience is the skill
 };

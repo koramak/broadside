@@ -22,6 +22,7 @@ export function newRun(): RunState {
     discoveries: [],
     revealedSecrets: [],
     shipwrecks: [],
+    salvageMarks: [],
     gear: { swivels: false, pumps: false },
     stores: EASY.on ? EASY.startingStores : 20,
     pool: 0,
@@ -91,7 +92,10 @@ function markShipwreck(run: RunState, rng: Rng, events: EventQueue): void {
   const isl = cand[rng.int(cand.length)];
   const a = rng.rnd(0, Math.PI * 2);
   const d = isl.r + rng.rnd(180, 380);
-  run.shipwrecks.push({ x: isl.x + Math.cos(a) * d, y: isl.y + Math.sin(a) * d });
+  const wx = isl.x + Math.cos(a) * d;
+  const wy = isl.y + Math.sin(a) * d;
+  run.shipwrecks.push({ x: wx, y: wy }); // spawns the floating crates
+  run.salvageMarks.push({ x: wx, y: wy }); // and a persistent mark on the chart
   const line = 'Her log marks a wreck off the reefs — cargo still bobbing free.';
   events.feed(line);
   discovery(run, '⚓ ' + line + ' A salvage site is on your chart.');

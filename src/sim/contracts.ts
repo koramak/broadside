@@ -160,6 +160,12 @@ function payOut(run: RunState, c: Contract, events: EventQueue): void {
   }
   run.contracts = run.contracts.filter((x) => x.id !== c.id);
   events.feed('Contract paid — ' + c.payout + ' stores, and ' + factionName(c.faction) + ' remembers it.');
+  events.emit({
+    kind: 'toast',
+    title: c.type === 'bounty' ? 'BOUNTY CLAIMED' : c.type === 'smuggle' ? 'CARGO RUN — DELIVERED' : 'CARGO DELIVERED',
+    sub: '+' + c.payout + ' stores · ' + factionName(c.faction) + ' remembers it',
+    tone: 'gold',
+  });
 }
 
 /** Try to settle any cargo contracts when you dock at `portId`. */

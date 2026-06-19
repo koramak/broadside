@@ -69,6 +69,21 @@ export class Minimap {
       g.fill();
     }
 
+    // charted salvage sites — pale rings you can run down for cargo
+    for (const m of run.salvageMarks) {
+      const x = this.sx(m.x);
+      const y = this.sy(m.y);
+      g.strokeStyle = 'rgba(180,210,215,.95)';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.arc(x, y, 3, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = 'rgba(180,210,215,.7)';
+      g.beginPath();
+      g.arc(x, y, 1, 0, Math.PI * 2);
+      g.fill();
+    }
+
     // your consorts — gold like everything that's yours
     g.fillStyle = 'rgba(217,164,65,.9)';
     for (const s of world.consorts) {
@@ -178,6 +193,21 @@ export class BigMap {
     for (const c of world.crates) {
       if (c.taken) continue;
       g.fillRect(this.sx(c.x) - 1.5, this.sy(c.y) - 1.5, 3, 3);
+    }
+
+    // charted salvage sites — labelled rings (from captured logs)
+    for (const m of run.salvageMarks) {
+      const x = this.sx(m.x);
+      const y = this.sy(m.y);
+      g.strokeStyle = 'rgba(180,210,215,.9)';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.arc(x, y, 6 + Math.sin(time * 3) * 1.2, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = 'rgba(180,210,215,.85)';
+      g.font = '11px Georgia, serif';
+      g.textAlign = 'left';
+      g.fillText('⚓ salvage', x + 9, y);
     }
 
     // settlements with NAMES

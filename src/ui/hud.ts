@@ -8,7 +8,7 @@ import { DOCTRINES, SAILNAMES } from '../sim/constants';
 import { loyaltyBand, loyaltyWord } from '../sim/captains';
 import { TUNING } from '../sim/tuning';
 import { GOODS, cargoLoad, fleetCargoCap } from '../sim/economy';
-import { FACTIONS } from '../sim/worldgen';
+import { FACTIONS, PORTS } from '../sim/worldgen';
 import { clamp, dist as distLike } from '../sim/math';
 import type { RunState } from '../sim/types';
 import { LINE_NAMES, station as boardStation } from '../sim/boarding';
@@ -33,8 +33,10 @@ interface FeedItem {
 export class Hud {
   private feedItems: FeedItem[] = [];
   private chipBars = new Map<number, HTMLElement>();
+  private chipCrewBars = new Map<number, HTMLElement>();
   private chipEls = new Map<number, HTMLElement>();
   private arrowPool: HTMLElement[] = [];
+  private toastT = 0;
   onTakeHelm: (idx: number) => void = () => {};
 
   feed(msg: string): void {
@@ -65,8 +67,24 @@ export class Hud {
     }
   }
 
+  /** A prominent confirmation banner (contracts paid, prizes claimed). Shows
+   *  over any screen — the player should never miss "you got paid." */
+  showToast(title: string, sub: string, tone: 'gold' | 'rust'): void {
+    const el = $('toast');
+    el.className = 'show ' + tone;
+    el.innerHTML = '<div class="ttitle">' + title + '</div><div class="tsub">' + sub + '</div>';
+    this.toastT = 3.4;
+  }
+
+  updateToast(dt: number): void {
+    if (this.toastT <= 0) return;
+    this.toastT -= dt;
+    if (this.toastT <= 0) $('toast').className = '';
+  }
+
   buildChips(battle: Battle): void {
     this.chipBars.clear();
+    this.chipCrewBars.clear();
     this.chipEls.clear();
     const f = $('fleet');
     f.innerHTML = '';
@@ -80,10 +98,12 @@ export class Hud {
       c.className = 'chip';
       c.innerHTML = `<button data-h="${i}">HELM</button><div class="nm">${s.legend ? '★ ' : ''}${s.name}</div>
         <div class="tr">Capt. ${s.captain ? s.captain[0] : '—'} · ${docShort}${mood}</div>
-        <div class="bar hull"><i></i></div>`;
+        <div class="bar hull" title="hull"><i></i></div>
+        <div class="bar crew" title="crew"><i></i></div>`;
       f.appendChild(c);
       this.chipEls.set(i, c);
-      this.chipBars.set(i, c.querySelector('.bar i') as HTMLElement);
+      this.chipBars.set(i, c.querySelector('.bar.hull i') as HTMLElement);
+      this.chipCrewBars.set(i, c.querySelector('.bar.crew i') as HTMLElement);
     });
     const e = $('estat');
     e.innerHTML = '';
@@ -92,11 +112,13 @@ export class Hud {
       const c = document.createElement('div');
       c.className = 'chip';
       c.innerHTML = `<div class="nm">${s.name}</div>
-        <div class="tr">Capt. ${s.captain ? s.captain[0] : '—'}</div>
-        <div class="bar hull"><i></i></div>`;
+        <div class="tr">Capt. ${s.captain ? s.captain[0] : '—'} · <span class="crewn">${s.crew}</span> hands</div>
+        <div class="bar hull" title="hull"><i></i></div>
+        <div class="bar crew" title="crew — thinned by grape"><i></i></div>`;
       e.appendChild(c);
       this.chipEls.set(i, c);
-      this.chipBars.set(i, c.querySelector('.bar i') as HTMLElement);
+      this.chipBars.set(i, c.querySelector('.bar.hull i') as HTMLElement);
+      this.chipCrewBars.set(i, c.querySelector('.bar.crew i') as HTMLElement);
     });
     document.querySelectorAll<HTMLElement>('[data-h]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -195,12 +217,18 @@ export class Hud {
       bb.style.display = 'none';
     }
 
-    // chips
+    // chips — hull + crew bars so grape attrition reads at a glance
     battle.ships.forEach((s2, i) => {
       const bar = this.chipBars.get(i);
       if (bar) bar.style.width = (s2.hull / s2.maxHull) * 100 + '%';
+      const cbar = this.chipCrewBars.get(i);
+      if (cbar) cbar.style.width = (s2.crew / s2.maxCrew) * 100 + '%';
       const el = this.chipEls.get(i);
-      if (el) el.classList.toggle('dead', !alive(s2));
+      if (el) {
+        el.classList.toggle('dead', !alive(s2));
+        const cn = el.querySelector('.crewn');
+        if (cn) cn.textContent = String(Math.max(0, Math.round(s2.crew)));
+      }
     });
   }
 
@@ -390,7 +418,47 @@ export class Hud {
 
   onDismissRumor: (i: number) => void = () => {};
 
-  syncLog(run: RunState): void {
+  syncLog(run: RunState, day: number): void {
+    // SHIP'S LEDGER — stores + hold + cargo (the old left-hand panel, now here)
+    const cargoRows = GOODS.filter((g) => (run.cargo[g.key] || 0) > 0)
+      .map((g) => '<div class="logrow"><span class="rtext">' + g.name + '</span><span class="rqty">× ' + run.cargo[g.key] + '</span></div>')
+      .join('');
+    $('logledger').innerHTML =
+      '<div class="ledgerbig">⚖ ' + run.stores + ' <span>stores</span></div>' +
+      '<div class="ledgersub">HOLD ' + cargoLoad(run) + ' / ' + fleetCargoCap(run) + '</div>' +
+      (cargoRows || '<div class="logempty">The hold is empty.</div>');
+
+    // ACTIVE ARTICLES — signed contracts with where to take them and time left
+    const missions = $('logmissions');
+    if (!run.contracts.length) {
+      missions.innerHTML = '<div class="logempty">No articles signed. Take work from a tavern’s job board.</div>';
+    } else {
+      missions.innerHTML = run.contracts.map((c) => {
+        const left = daysLeft(c, day);
+        const urgent = left <= 2 ? ' style="color:var(--rust)"' : '';
+        let where: string;
+        if (c.type === 'delivery' || c.type === 'smuggle') {
+          const dp = PORTS.find((p) => p.id === c.destPortId);
+          where = 'Carry ' + c.qty + ' ' + (GOODS.find((g) => g.key === c.good)?.name.toLowerCase() ?? '') +
+            ' → ' + (dp ? dp.name : '?');
+        } else {
+          where = 'Take or sink ' + (c.bountyName ?? 'the quarry');
+        }
+        return '<div class="logmission"><div class="mtitle">' + c.title + '</div>' +
+          '<div class="mwhere">' + where + '</div>' +
+          '<div class="mdead"' + urgent + '>' + left + ' days left · +' + c.payout + ' stores</div></div>';
+      }).join('');
+    }
+
+    // STANDING — faction reputation (the old rep panel)
+    $('logrep').innerHTML = FACTIONS.map((f) => {
+      const r = run.rep[f.key];
+      const word = r > 30 ? 'ally' : r > -20 ? 'wary' : r > -50 ? 'hostile' : 'shoot on sight';
+      const col = r > 30 ? 'var(--gold)' : r > -20 ? 'var(--parch-dim)' : 'var(--rust)';
+      return '<div class="logrow"><span class="rtext">' + f.name + '</span>' +
+        '<span class="rqty" style="color:' + col + '">' + word + ' (' + r + ')</span></div>';
+    }).join('');
+
     const rumors = $('logrumors');
     rumors.innerHTML = '';
     if (!run.rumors.length) {
@@ -435,8 +503,6 @@ export class Hud {
     $('ammo').style.display = battle ? 'flex' : 'none';
     $('fleet').style.display = battle ? 'flex' : 'none';
     $('estat').style.display = battle ? 'flex' : 'none';
-    $('cargo').style.display = battle ? 'none' : 'block';
-    $('rep').style.display = battle ? 'none' : 'block';
     $('minimap').style.display = battle ? 'none' : 'block';
     $('logbtn').style.display = battle ? 'none' : 'block';
     if (!battle) $('boardbtn').style.display = 'none';
@@ -470,26 +536,8 @@ export class Hud {
     } else {
       dock.style.display = 'none';
     }
-
-    $('cargolist').innerHTML =
-      'STORES ' + run.stores + ' · HOLD ' + cargoLoad(run) + '/' + fleetCargoCap(run) + '<br>' +
-      (GOODS.filter((g) => (run.cargo[g.key] || 0) > 0)
-        .map((g) => g.name + ' × ' + run.cargo[g.key])
-        .join(' · ') || '') +
-      (run.contracts.length
-        ? '<br><span class="rumorhead">SIGNED ARTICLES</span><br>' +
-          run.contracts.map((c) => '• ' + c.title + ' (' + daysLeft(c, world.day) + 'd)').join('<br>')
-        : '') +
-      (run.rumors.length
-        ? '<br><span class="rumorhead">HEARD IN THE TAVERNS</span><br>' +
-          run.rumors.map((r) => '«' + r.text + '»').join('<br>')
-        : '');
-
-    $('replist').innerHTML = FACTIONS.map((f) => {
-      const r = run.rep[f.key];
-      const word = r > 30 ? 'ally' : r > -20 ? 'wary' : r > -50 ? 'hostile' : 'shoot on sight';
-      return f.name + ': ' + r + ' (' + word + ')';
-    }).join('<br>');
+    // stores/cargo/contracts/standing now live in the Captain's Log (L) — the
+    // old left-hand ledger panels were removed to clear the map view.
   }
 }
 

@@ -36,6 +36,7 @@
 </div>
 <button id="pausebtn">⏸</button>
 <div id="feed"></div>
+<div id="toast"></div>
 
 <div class="panel" id="helm">
   <button id="bport">◀</button>
@@ -82,14 +83,6 @@
 </div>
 <div class="panel" id="hint">A/D steer · W/S sails · 1-3 shot · Q/E fire · F signal · G order · Tab take helm · B board · Esc menu</div>
 
-<div class="panel" id="cargo">
-  <div class="lbl">Hold &amp; Ledger</div>
-  <div id="cargolist" class="sub">—</div>
-</div>
-<div class="panel" id="rep">
-  <div class="lbl">Standing</div>
-  <div id="replist" class="sub">—</div>
-</div>
 <div class="panel" id="minimap">
   <div class="lbl">The Chart — click to open</div>
   <canvas id="mmc"></canvas>
@@ -170,6 +163,9 @@
 <div id="log">
   <h1>THE CAPTAIN'S LOG</h1>
   <div id="logcols">
+    <div class="logcol"><h3>SHIP’S LEDGER</h3><div id="logledger" class="logbody"></div></div>
+    <div class="logcol"><h3>ACTIVE ARTICLES</h3><div id="logmissions" class="logbody"></div></div>
+    <div class="logcol"><h3>STANDING</h3><div id="logrep" class="logbody"></div></div>
     <div class="logcol"><h3>INTELLIGENCE</h3><div id="logrumors" class="logbody"></div></div>
     <div class="logcol"><h3>DISCOVERIES</h3><div id="logdisc" class="logbody"></div></div>
     <div class="logcol"><h3>THE CHRONICLE</h3><div id="logchron" class="logbody"></div></div>

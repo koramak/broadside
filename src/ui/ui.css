@@ -33,6 +33,14 @@ button.on{background:rgba(217,164,65,.25);border-color:var(--gold)}
 button:disabled{opacity:.35;cursor:default}
 #feed{position:fixed;top:150px;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;font-family:'Courier New',monospace;font-size:19px;letter-spacing:.04em;max-width:92vw;z-index:5}
 #feed div{color:var(--gold);text-shadow:0 2px 6px #000;margin-top:5px;transition:opacity .5s}
+#toast{position:fixed;bottom:26vh;left:50%;transform:translateX(-50%) translateY(14px);z-index:30;pointer-events:none;opacity:0;
+  background:rgba(11,27,34,.94);border:1px solid var(--gold);border-radius:10px;padding:12px 24px;text-align:center;min-width:240px;
+  box-shadow:0 8px 28px rgba(0,0,0,.55);transition:opacity .35s,transform .35s}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.rust{border-color:var(--rust)}
+#toast .ttitle{font-size:21px;letter-spacing:.14em;color:var(--gold)}
+#toast.rust .ttitle{color:var(--rust)}
+#toast .tsub{font-size:15px;font-family:'Courier New',monospace;color:var(--parch);margin-top:3px;letter-spacing:.04em}
 #ammo{bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:8px;position:fixed;background:rgba(11,27,34,.78);border:1px solid rgba(233,220,190,.22);border-radius:8px;z-index:5}
 #ammo button{padding:10px 16px;font-size:19px}
 #ammo .k{font-size:14px;color:var(--parch-dim);display:block}
@@ -99,11 +107,14 @@ button:disabled{opacity:.35;cursor:default}
 .bstation.parted{border-color:var(--rust)}
 .bstation.parted .bsub{color:var(--rust)}
 .bstation.axe .bsub{color:var(--gold)}
-#cargo{bottom:110px;left:12px;display:none;z-index:5;min-width:260px;max-width:340px}
-#cargo .sub{line-height:1.6}
-.rumorhead{color:var(--gold);letter-spacing:.1em;font-size:13px}
-#rep{top:230px;left:12px;display:none;z-index:5;min-width:260px}
-#rep .sub{line-height:1.6}
+.ledgerbig{font-size:26px;color:var(--gold);letter-spacing:.04em;margin-bottom:2px}
+.ledgerbig span{font-size:13px;color:var(--parch-dim);letter-spacing:.1em}
+.ledgersub{font-family:'Courier New',monospace;font-size:13px;color:var(--parch-dim);letter-spacing:.08em;margin-bottom:8px}
+.logrow .rqty{color:var(--parch-dim);flex-shrink:0;font-family:'Courier New',monospace}
+.logmission{padding:7px 0;border-bottom:1px solid rgba(233,220,190,.07)}
+.logmission .mtitle{color:var(--gold);font-size:14px;letter-spacing:.04em}
+.logmission .mwhere{font-family:'Courier New',monospace;font-size:13px;color:var(--parch);margin-top:2px}
+.logmission .mdead{font-family:'Courier New',monospace;font-size:12px;color:var(--parch-dim);margin-top:1px}
 #minimap{bottom:14px;right:12px;display:none;z-index:5;cursor:pointer}
 #minimap canvas{display:block;margin-top:5px;background:rgba(11,27,34,.5);border:1px solid rgba(233,220,190,.14);border-radius:4px;pointer-events:none}
 #logbtn{position:fixed;bottom:14px;right:248px;display:none;z-index:5;font-family:'Courier New',monospace;font-size:15px;letter-spacing:.08em;padding:10px 14px;color:var(--gold);border-color:rgba(217,164,65,.5)}
@@ -170,7 +181,6 @@ button:disabled{opacity:.35;cursor:default}
   .fbtn{width:96px;height:60px;font-size:14px}
   #sigbtn,#orderbtn{width:96px;height:34px;font-size:11px}
   #boardbtn,#dockbtn{font-size:15px;padding:11px 15px}
-  #cargo{min-width:200px;max-width:240px} #rep{min-width:200px}
   .hcard{width:300px} #port h1,#overlay h1,#pausemenu h1,#harbor h1{font-size:30px}
 }
 @media (max-width:760px){
@@ -179,9 +189,6 @@ button:disabled{opacity:.35;cursor:default}
   .chip{width:150px} #ammo{bottom:104px}
   #boardbtn{bottom:260px} #dockbtn{bottom:260px} #feed{top:140px;font-size:12px}
   .hcard{width:88vw}
-  #cargo{bottom:auto;top:170px;min-width:150px;max-width:170px}
-  #cargo .sub{font-size:10px}
-  #rep{top:300px;min-width:150px}
   #boarding{bottom:12px;width:98vw}
   .bstation{width:74px;height:96px} .bring{width:46px;height:46px}
   .blabel{font-size:9px} .bsub{font-size:8px} .bkey{font-size:15px;top:22px}

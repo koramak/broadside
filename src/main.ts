@@ -24,7 +24,7 @@ import { HarborScreen } from './ui/harbor';
 import { PortScreen } from './ui/port';
 import { Input } from './input/input';
 import { Minimap, BigMap } from './ui/minimap';
-import { audio, boom, setMusic, boardTick, boardFoul, woodHit, splash } from './audio';
+import { audio, boom, setMusic, boardTick, boardFoul, woodHit, splash, chime } from './audio';
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 import { refreshRumors } from './sim/economy';
 import { deliverAtPort, generateBoard } from './sim/contracts';
@@ -58,7 +58,7 @@ let mode: Mode = 'map';
 
 function toggleLog(v?: boolean): void {
   logOpen = v === undefined ? !logOpen : v;
-  if (logOpen) hud.syncLog(run);
+  if (logOpen) hud.syncLog(run, world ? world.day : 0);
   $('log').style.display = logOpen ? 'flex' : 'none';
 }
 
@@ -236,7 +236,7 @@ const input = new Input({
 
 hud.onDismissRumor = (i) => {
   run.rumors.splice(i, 1);
-  hud.syncLog(run);
+  hud.syncLog(run, world ? world.day : 0);
 };
 $('logbtn').addEventListener('click', () => {
   audio();
@@ -481,11 +481,18 @@ function frame(now: number): void {
               effects.smoke(me.x + off, me.y, me.heading + Math.PI / 2);
           }
           break;
+        case 'toast':
+          hud.showToast(e.title, e.sub, e.tone);
+          chime();
+          break;
         default:
           break;
       }
     }
   }
+
+  // a reward banner can fire in any mode — tick it down every frame
+  hud.updateToast(dtReal);
 
   // palette follows where the flagship actually is, battle or chart
   shell.setMood(world ? world.inMist() : false, dtReal);
@@ -519,6 +526,7 @@ function frame(now: number): void {
     effects.update(paused || mode !== 'map' ? 0 : dtReal);
     if (mode === 'map') {
       world.materializeShipwrecks(run); // log-marked wrecks become floating crates
+      world.pruneSalvageMarks(run); // drop charted marks once their crates are gathered
       hud.syncMap(world, run);
       const targets: { x: number; y: number; color: string }[] = [];
       const obj = currentObjective(run);

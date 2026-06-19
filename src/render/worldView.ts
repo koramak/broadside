@@ -38,6 +38,7 @@ export class WorldView {
   private contactViews = new Map<number, ShipView>();
   private consortViews: ShipView[] = [];
   private crateMeshes = new Map<number, THREE.Group>();
+  private salvageRings: THREE.Mesh[] = [];
   private portViews: { port: PortDef; group: THREE.Group; label: THREE.Sprite }[] = [];
   private marker: THREE.Group;
   private markerRing: THREE.Mesh;
@@ -258,6 +259,26 @@ export class WorldView {
       }
     }
 
+    // charted salvage sites — a pale ring on the water you can run down for cargo
+    while (this.salvageRings.length < run.salvageMarks.length) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(60, 74, 36),
+        new THREE.MeshBasicMaterial({ color: 0xb4d2d7, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 5;
+      this.group.add(ring);
+      this.salvageRings.push(ring);
+    }
+    run.salvageMarks.forEach((m, i) => {
+      const ring = this.salvageRings[i];
+      ring.visible = true;
+      ring.position.set(m.x, 5, m.y);
+      (ring.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.2 * Math.sin(time * 2 + i);
+    });
+    for (let i = run.salvageMarks.length; i < this.salvageRings.length; i++) {
+      this.salvageRings[i].visible = false;
+    }
   }
 
   setVisible(v: boolean): void {

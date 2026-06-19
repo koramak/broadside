@@ -131,6 +131,8 @@ export interface RunState {
   revealedSecrets: string[];
   /** floating-salvage sites marked by captured logs, waiting to materialize */
   shipwrecks: { x: number; y: number }[];
+  /** charted salvage sites — drawn on the chart until their crates are gathered */
+  salvageMarks: { x: number; y: number }[];
   /** chandler gear: bolt-on historical upgrades */
   gear: { swivels: boolean; pumps: boolean };
   stores: number;

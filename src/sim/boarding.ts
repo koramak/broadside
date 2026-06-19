@@ -190,7 +190,16 @@ export function tap(
     return 'hit';
   }
 
-  // priming or fouled: taps do nothing — patience is part of the skill
+  // tapping during the white fill is too early — it FOULS the station (red dead
+  // time, same as missing the gold window). Patience is the skill.
+  if (s.phase === 'priming' && C.earlyTapFouls) {
+    s.phase = 'fouled';
+    s.t = 0;
+    events.emit({ kind: 'boardFoul', station: id });
+    return 'dead';
+  }
+
+  // priming (penalty off) or already fouled: nothing happens
   return 'dead';
 }
 
