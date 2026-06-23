@@ -27,7 +27,10 @@ export function newRun(): RunState {
     stores: EASY.on ? EASY.startingStores : 20,
     pool: 0,
     up: { canvas: 0, guns: 0, timbers: 0 },
-    flag: { cls: 'brig', hullPct: 1, sailHP: 100, crewPct: 1, rudderHP: 100, gunDef: [0, 0] },
+    // FEEL (2026-06-23): start in a Sloop, not a Brig — the player begins at the
+    // helm of the hand-carved diorama sloop (her only class for now). Lighter hull
+    // (75 vs 115) and fewer guns (4 vs 6); authorized design change.
+    flag: { cls: 'sloop', hullPct: 1, sailHP: 100, crewPct: 1, rudderHP: 100, gunDef: [0, 0] },
     armada: [],
     pendingPrizes: [],
     stats: { prizes: 0, sunk: 0 },

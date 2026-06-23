@@ -7,6 +7,7 @@ import type { Ship } from '../sim/types';
 import { SAILS } from '../sim/constants';
 import { clamp } from '../sim/math';
 import { ModelLibrary, shipModelName } from './models';
+import { buildDioramaShip } from './dioramaShip';
 
 const TEAM_TRIM = { p: 0xd9a441, e: 0xc4583a } as const;
 
@@ -17,7 +18,8 @@ export const SHIP_VISUAL_SCALE = 2;
 
 export class ShipView {
   group = new THREE.Group();
-  private sails: THREE.Mesh[] = [];
+  private isDiorama = false;
+  private sails: THREE.Object3D[] = [];
   private hullMats: THREE.MeshStandardMaterial[] = [];
   private sailMats: THREE.MeshStandardMaterial[] = [];
   private baseHullColors: THREE.Color[] = [];
@@ -27,34 +29,41 @@ export class ShipView {
   private listDir: number;
 
   constructor(public ship: Ship, lib: ModelLibrary, modelOverride?: string) {
-    const name = modelOverride ?? (ship.ghost ? 'ship-ghost' : shipModelName(ship.cls, ship.team, ship.faction));
-    const model = lib.instantiateShip(name, ship.len * 1.06 * SHIP_VISUAL_SCALE);
-    this.group.add(model.root);
+    // Sloops wear the hand-carved diorama hull (the Broadside Ship 3D design);
+    // brigs, frigates, ghosts and wrecks still sail the Kenney kit for now.
+    if (!modelOverride && !ship.ghost && ship.cls === 'sloop') {
+      this.isDiorama = true;
+      this.buildDiorama();
+    } else {
+      const name = modelOverride ?? (ship.ghost ? 'ship-ghost' : shipModelName(ship.cls, ship.team, ship.faction));
+      const model = lib.instantiateShip(name, ship.len * 1.06 * SHIP_VISUAL_SCALE);
+      this.group.add(model.root);
 
-    if (ship.ghost) {
-      // pale, half-there, lit from somewhere that isn't the sun
-      model.root.traverse((o) => {
-        if (o instanceof THREE.Mesh) {
-          const m = o.material as THREE.MeshStandardMaterial;
-          m.transparent = true;
-          m.opacity = 0.78;
-          if (m.emissive) m.emissive.setHex(0x1d3a35);
-        }
-      });
-    }
+      if (ship.ghost) {
+        // pale, half-there, lit from somewhere that isn't the sun
+        model.root.traverse((o) => {
+          if (o instanceof THREE.Mesh) {
+            const m = o.material as THREE.MeshStandardMaterial;
+            m.transparent = true;
+            m.opacity = 0.78;
+            if (m.emissive) m.emissive.setHex(0x1d3a35);
+          }
+        });
+      }
 
-    for (const m of model.hullMeshes) {
-      const mat = m.material as THREE.MeshStandardMaterial;
-      this.hullMats.push(mat);
-      this.baseHullColors.push(mat.color.clone());
-    }
-    for (const m of model.sails) {
-      const mat = m.material as THREE.MeshStandardMaterial;
-      mat.transparent = true;
-      mat.side = THREE.DoubleSide;
-      this.sailMats.push(mat);
-      this.baseSailColors.push(mat.color.clone());
-      this.sails.push(m);
+      for (const m of model.hullMeshes) {
+        const mat = m.material as THREE.MeshStandardMaterial;
+        this.hullMats.push(mat);
+        this.baseHullColors.push(mat.color.clone());
+      }
+      for (const m of model.sails) {
+        const mat = m.material as THREE.MeshStandardMaterial;
+        mat.transparent = true;
+        mat.side = THREE.DoubleSide;
+        this.sailMats.push(mat);
+        this.baseSailColors.push(mat.color.clone());
+        this.sails.push(m);
+      }
     }
 
     // strike flag (white) above the deck when she surrenders
@@ -86,6 +95,38 @@ export class ShipView {
     this.listDir = (ship.x * 7 + ship.y * 13) % 2 === 0 ? 1 : -1;
   }
 
+  /** Build the procedural carved-wood sloop and fit it to this ship's scale. */
+  private buildDiorama(): void {
+    const ship = this.ship;
+    const d = buildDioramaShip();
+    const inner = d.root;
+    inner.rotation.y = Math.PI / 2;            // design bow is +Z; the sim wants the bow at +X
+    const box = new THREE.Box3().setFromObject(inner);
+    const c = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const target = ship.len * 1.06 * SHIP_VISUAL_SCALE;
+    inner.position.x = -c.x;                    // centre fore-aft and athwartships...
+    inner.position.z = -c.z;
+    // ...but KEEP the authored waterline (y=0) at sea level so the keel stays
+    // below the surface, hidden by the sea plane, instead of floating on top.
+    const wrapper = new THREE.Group();
+    wrapper.add(inner);
+    wrapper.scale.setScalar(target / Math.max(size.x, size.z));
+    this.group.add(wrapper);
+
+    for (const mat of d.hullMats) {
+      this.hullMats.push(mat);
+      this.baseHullColors.push(mat.color.clone());
+    }
+    for (const mat of d.sailMats) {
+      mat.transparent = true;
+      mat.side = THREE.DoubleSide;
+      this.sailMats.push(mat);
+      this.baseSailColors.push(mat.color.clone());
+    }
+    this.sails.push(...d.sails);
+  }
+
   update(controlled: boolean, time: number): void {
     const s = this.ship;
     this.group.position.set(s.x, 0, s.y);
@@ -113,8 +154,9 @@ export class ShipView {
     const shp = s.sailHP / 100;
     for (const sail of this.sails) {
       sail.visible = set > 0;
-      const squash = 0.45 + 0.55 * set;
-      sail.scale.set(1, squash, 1);
+      // Kenney sails squash toward the yards when reefed; the diorama's carved
+      // sails are built in place, so we just raise or furl them whole.
+      if (!this.isDiorama) sail.scale.set(1, 0.45 + 0.55 * set, 1);
     }
     for (let i = 0; i < this.sailMats.length; i++) {
       const m = this.sailMats[i];
@@ -148,8 +190,10 @@ export class ShipView {
     scene.remove(this.group);
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh) {
-        // geometries of kit models are shared with the template — leave them;
-        // materials were cloned per instance, so free those
+        // kit geometries are shared with the template — leave them; the diorama
+        // builds unique geometry per ship, so free that too. Materials are
+        // per-instance in both paths.
+        if (this.isDiorama) o.geometry.dispose();
         (Array.isArray(o.material) ? o.material : [o.material]).forEach((m: THREE.Material) => m.dispose());
       }
     });
