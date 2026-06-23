@@ -104,7 +104,11 @@ export class ShipView {
     const box = new THREE.Box3().setFromObject(inner);
     const c = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    const target = ship.len * 1.06 * SHIP_VISUAL_SCALE;
+    // FEEL: the long bowsprit + boom overhang inflate the bounding box, so
+    // normalizing by it shrinks the hull vs the Kenney kit — and the carved ship
+    // is meant to read as the hero. Draw her 1.5× the kit's target length.
+    const DIORAMA_SCALE = 1.5;
+    const target = ship.len * 1.06 * SHIP_VISUAL_SCALE * DIORAMA_SCALE;
     inner.position.x = -c.x;                    // centre fore-aft and athwartships...
     inner.position.z = -c.z;
     // ...but KEEP the authored waterline (y=0) at sea level so the keel stays
