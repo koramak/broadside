@@ -4,7 +4,7 @@ Companion to CLAUDE.md (which holds locked canon + the file map / how-to-run).
 This file tracks what's actually built, what's in flight, and what's undecided.
 Keep it honest: describe what the code does, not what it's meant to do.
 
-_Last updated: 2026-07-01, end of the "wind shifts + battle juice" batch (telegraphed mid-battle wind shifts with rose ghost-arrow + whoosh; screen shake, splinter bursts, sink wash). Working tree clean; everything below is committed + deployed._
+_Last updated: 2026-07-01, end of the "real Caribbean chart" batch (the map is now the actual Windward Passage — Jamaica/Cuba/Hispaniola, historical ports; earlier today: wind shifts + battle juice). Working tree clean; everything below is committed + deployed._
 
 ## System status
 
@@ -23,7 +23,8 @@ _Last updated: 2026-07-01, end of the "wind shifts + battle juice" batch (telegr
 | Port events | **working** | `portEvents.ts`. Banner on docking (≈55%, deterministic per port+day, same-day re-roll guarded): passive (press-gang, fire, fever, festival, debt, rot) + choices (customs bribe/open, dockside duel, stowaway). Contraband makes customs bite. |
 | Boarding melee crowds | **working** | `render/boardingCrowd.ts`. Instanced miniature crew at the rail seam, gold vs rust, boundary slides with `board.front`, density tracks hand counts. The deferred "wow", now shipped. |
 | 6-action story → Plate Ship → 3 Mist actions → THE HARROW | **working** | `worldgen.ESCALATION` (locked) + Mist waves. Ghosts ignore the wind curve (the one shipped rule-breaker). |
-| Sea map (real-time wind sailing, contacts flee/hunt/lane, pursuit give-up, crates) | **working** | `world.ts`. Mortals won't enter the Mist; ghosts won't leave it. |
+| Sea map (real-time wind sailing, contacts flee/hunt/lane, pursuit give-up, crates) | **working** | `world.ts`. Mortals won't enter the Mist; ghosts won't leave it. New with the real chart: contacts never spawn on land, and lane traffic pinned against a coast >10s re-picks its waypoint. |
+| The chart = the real WINDWARD PASSAGE (2026-07-01, human-chosen) | **working** | `worldgen.ts`. Jamaica, eastern Cuba, and Hispaniola authored as circle-chain landmasses from real positions (~1200 units/°lon, screen north = −y). Ports are historical and faction-true: Crown = Port Royal + Port Antonio; Compañía = Santiago de Cuba + Santo Domingo (the Mist-edge port); Brethren = Tortuga + Petit-Goâve — the literal Brethren of the Coast. Secrets: Île-à-Vache (Morgan's staging anchorage) + Cayo Levantado (Samaná). Story actions: Jamaica channel → gulf mouth → the Windward Passage itself → Tortuga's north water → old Bahama channel → Santo Domingo roadstead; the Mist swallows the Mona Passage. Verified by in-browser audit: no enclosed lagoons (interior fill islands), every port dockable, every mark reachable by flood-fill from the player's berth. Whole-Caribbean map deferred (test slice on purpose). Shipwreck drops retry until open water (`run.markShipwreck`). |
 | Trading economy (6 goods, port bias, day wobble) | **working** | `economy.ts`. Sinking now also drops floating cargo + rescued men. |
 | Factions + reputation | **working** | 3 factions; rep starts crown −10 / compañía 0 / brethren 15; `applyKillRep` moves it (sink ≈ 2× take; Brethren admire no-quarter, Crown abhors it); ports lock out at ≤ −50. |
 | Tutorial (guided fight→port→fight chain + favorable tutorial wind) | **working** | `objectives.ts`. Wind rig is EASY-gated. |
