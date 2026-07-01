@@ -23,6 +23,16 @@ interface RingFx {
   color: THREE.Color;
 }
 
+interface Splinter {
+  mesh: THREE.Mesh;
+  life: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  rx: number;
+  rz: number;
+}
+
 function smokeTexture(): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
@@ -42,6 +52,15 @@ export class Effects {
   private smokeTex = smokeTexture();
   private puffs: Puff[] = [];
   private rings: RingFx[] = [];
+
+  // splinters: the model chips like a model — bare timber + flecks of paint
+  private splinterGeo = new THREE.BoxGeometry(3.4, 1.2, 1.2);
+  private splinterMats = [
+    new THREE.MeshLambertMaterial({ color: 0x6b4a2f }),
+    new THREE.MeshLambertMaterial({ color: 0x8a6a43 }),
+    new THREE.MeshLambertMaterial({ color: 0xcdbb90 }),
+  ];
+  private splinters: Splinter[] = [];
 
   // cannonballs
   private ballGeo = new THREE.SphereGeometry(2.4, 8, 6);
@@ -97,6 +116,36 @@ export class Effects {
 
   impact(x: number, y: number): void {
     this.smoke(x, y, Math.random() * Math.PI * 2, false);
+    const n = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) {
+      const mesh = new THREE.Mesh(
+        this.splinterGeo,
+        this.splinterMats[Math.floor(Math.random() * this.splinterMats.length)],
+      );
+      mesh.position.set(x, 16, y);
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+      this.scene.add(mesh);
+      const a = Math.random() * Math.PI * 2;
+      const sp = 30 + Math.random() * 60;
+      this.splinters.push({
+        mesh, life: 0.9,
+        vx: Math.cos(a) * sp, vz: Math.sin(a) * sp, vy: 50 + Math.random() * 70,
+        rx: (Math.random() - 0.5) * 14, rz: (Math.random() - 0.5) * 14,
+      });
+    }
+  }
+
+  /** A hull goes under: a wide wash ring + a roil of spray over the spot. */
+  sinkBurst(x: number, y: number): void {
+    this.ring(x, y, 0xb4d2d7, 1.6, 10, 52);
+    for (let i = 0; i < 6; i++) {
+      this.smoke(
+        x + (Math.random() - 0.5) * 30,
+        y + (Math.random() - 0.5) * 30,
+        Math.random() * Math.PI * 2,
+        true,
+      );
+    }
   }
 
   /** Sync cannonballs + landing telegraphs to sim state (called every frame). */
@@ -152,6 +201,21 @@ export class Effects {
       p.sprite.scale.setScalar(p.baseScale * (1 + (1 - k) * 1.6));
       p.sprite.material.opacity = 0.6 * k;
     }
+    for (let i = this.splinters.length - 1; i >= 0; i--) {
+      const s = this.splinters[i];
+      s.life -= dt;
+      if (s.life <= 0 || s.mesh.position.y < 2) {
+        this.scene.remove(s.mesh); // geo/mats are shared — never disposed
+        this.splinters.splice(i, 1);
+        continue;
+      }
+      s.vy -= 220 * dt;
+      s.mesh.position.x += s.vx * dt;
+      s.mesh.position.y += s.vy * dt;
+      s.mesh.position.z += s.vz * dt;
+      s.mesh.rotation.x += s.rx * dt;
+      s.mesh.rotation.z += s.rz * dt;
+    }
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
       r.life -= dt;
@@ -181,6 +245,8 @@ export class Effects {
       (r.mesh.material as THREE.Material).dispose();
     }
     this.rings = [];
+    for (const s of this.splinters) this.scene.remove(s.mesh);
+    this.splinters = [];
     for (const m of [...this.ballMeshes, ...this.shadowMeshes, ...this.landMeshes]) {
       this.scene.remove(m);
     }

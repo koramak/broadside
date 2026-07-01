@@ -25,6 +25,9 @@ export class SceneShell {
   /** 0 = sailing wide, 1 = boarding closeup — glides between the two */
   private focus = 0;
   private focusTarget = 0;
+  /** camera-shake trauma 0..1 — kicks accumulate, amplitude goes as trauma² */
+  private trauma = 0;
+  private shakeT = 0;
   private seaGeo: THREE.PlaneGeometry;
   private sea: THREE.Mesh;
   private seaTime = { value: 0 };
@@ -143,6 +146,12 @@ export class SceneShell {
     this.focusTarget = on ? 1 : 0;
   }
 
+  /** Bump the diorama table. Kicks stack (a full broadside lands as one
+   *  thump-per-gun) and clamp at 1; decay is fast so it reads as a jolt. */
+  kick(amount: number): void {
+    this.trauma = Math.min(1, this.trauma + amount);
+  }
+
   /** Smoothly follow a sim-space point (sim x,y → world x,z). */
   follow(x: number, y: number, dt: number): void {
     const k = 1 - Math.exp(-dt * 3.2);
@@ -157,6 +166,16 @@ export class SceneShell {
     const up = dist * Math.sin(elev);
     this.camera.position.set(this.camTarget.x, up, this.camTarget.z + back);
     this.camera.lookAt(this.camTarget.x, 0, this.camTarget.z);
+    // Screen shake: a translational bump after lookAt — the whole table
+    // jolts, the horizon never tilts. Two incommensurate sines per axis so
+    // repeated broadsides don't feel like the same canned wobble.
+    this.shakeT += dt;
+    this.trauma = Math.max(0, this.trauma - dt * 2.0);
+    const sh = this.trauma * this.trauma;
+    if (sh > 0.0002) {
+      this.camera.position.x += (Math.sin(this.shakeT * 31) + 0.6 * Math.sin(this.shakeT * 47)) * 13 * sh;
+      this.camera.position.z += (Math.cos(this.shakeT * 27) + 0.6 * Math.sin(this.shakeT * 41)) * 9 * sh;
+    }
   }
 
   /** Animate swells + drift wind streaks. */
