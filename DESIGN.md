@@ -4,7 +4,7 @@ Companion to CLAUDE.md (which holds locked canon + the file map / how-to-run).
 This file tracks what's actually built, what's in flight, and what's undecided.
 Keep it honest: describe what the code does, not what it's meant to do.
 
-_Last updated: 2026-06-18, end of the "playtest-feedback fixes" batch (ledger→log + active missions, salvage chart marks, enemy crew bar, contract-paid toast + chime, boarding early-tap foul). Working tree clean; everything below is committed + deployed._
+_Last updated: 2026-07-01, end of the "wind shifts + battle juice" batch (telegraphed mid-battle wind shifts with rose ghost-arrow + whoosh; screen shake, splinter bursts, sink wash). Working tree clean; everything below is committed + deployed._
 
 ## System status
 
@@ -13,6 +13,8 @@ _Last updated: 2026-06-18, end of the "playtest-feedback fixes" batch (ledger→
 | Wind / sailing physics | **working** | `physics.ts`, shared by battle + map. Locked point-of-sail curve; committed turning; pace amp ×1.15 spd / ×1.2 turn (permanent); rowing floor ROW_EFF 0.075 ≈ 1.5× dead-into-wind. |
 | Gunnery (straddle aim, ammo, rake, subsystems, weather gauge) | **working** | Ported from the slice, constants in `constants.ts`. Pause-menu dials (ball speed / reload / rake) live in `tuning.ts`. Fleet/enemy chips now carry a **crew bar + live hand-count** under the hull bar, so grape attrition reads at a glance. |
 | Enemy AI (Bulldog/Surgeon/Corsair doctrines) | **working** | In `battle.ts`. Corsair stern-rake hunting is the skill check. |
+| Mid-battle wind shifts | **working (tuning open)** | `battle.stepWindShift` + `WIND_SHIFT` dials in `constants.ts` (NOT locked). Telegraphed: feed line + low whoosh + a pulsing ghost arrow on the rose at the incoming quarter, 12s warning, then an 8–14s smoothstep veer of ~29–60°. Re-deals the weather gauge; AI adapts live. Suppressed in guided Action 1 (tutorial reads clean) and paused during boarding. Map wind untouched. |
+| Battle juice (screen shake, splinters, sink wash) | **working** | Render-only. `SceneShell.kick` — trauma-based translational shake (the diorama table jolts, the horizon never tilts), distance-scaled per muzzle/impact/sinking via `kickAt` in `main.ts`. Impacts throw timber-and-paint splinter chips (`effects.impact`); a hull going under gets a wide wash ring + spray (`effects.sinkBurst`). |
 | Armada (2 consorts, signal gun, engage/form-on-me, possession) | **working** | Cap stays 2. `replaceConsort` swaps when full (pay one off for ½ value). Consorts also sail the chart in formation. |
 | Consort captains as characters (temperament + loyalty + voice) | **working** | `captains.ts`. Each consort has a doctrine-borne TEMPERAMENT (creed/loves/hates) and a LOYALTY that drifts with use: orders for/against type, signal use, a contentment sample, battle-end verdict. High → fights harder + obeys instantly; mutinous → refuses signals, ignores form-up, deserts (≤6) with her hull. CAROUSE buys goodwill back. Disco-Elysium barks in the feed; mood on chips + harbor cards. |
 | Flagship trade-up (HOIST YOUR FLAG) | **working** | `run.hoistFlag`. Any prize can become your flagship; crew + refits carry, she comes worn (hull 60%), old hull sold for prize value. Chart ship + mesh rebuild on class change. The Plate Ship is now sailable. |
@@ -70,13 +72,27 @@ All TUNING-open, not design-open — playtest verdicts wanted on:
   presence roll. `LEGENDS` in `captains.ts`.
 - **Port-event frequency/severity** — the 55% roll + per-event weights/amounts in
   `portEvents.ts`.
+- **Wind-shift cadence & size (NEW 2026-07-01)** — first shift 25–45s in, then
+  every 40–75s; 12s warning; 8–14s veer of ~29–60°. All in `WIND_SHIFT`
+  (`constants.ts`, exposed on `window.__broadside`). Also open: should ghost
+  battles shift? (currently they DO — the shift only hurts the player there,
+  since the Drowned ignore the wind; kept for tension, flag if it feels cruel).
+- **Shake amplitude (NEW 2026-07-01)** — kick strengths in `main.ts` `kickAt`
+  calls (muzzle 0.09/gun, impact 0.3, sinking 0.5) and the amplitude/decay in
+  `renderer.ts`. Tuned subtle-first; turn it up if it doesn't register.
+
+Shipped 2026-07-01: **mid-battle wind shifts** and **screen-shake & juice**
+(both were backlog items; both are tuning-open above).
 
 Next from the backlog (human to pick): **escort contracts** (the one contract
 type still deferred — needs a friendly NPC that paths to a port and can be
-attacked); spyglass enemy-intel; boarding-assist consort order; mid-battle wind
-shifts; crew-quality refit (the `surgeonsMate` hook in boardingConfig is reserved
-for this); price impact from your own trades; notoriety-driven navy hunts/
-blockades; meta-progression between runs; branching route map; weather/day-night;
-screen-shake & juice; richer boarding-crowd figures; combat SFX samples (asset
+attacked; same tech unlocks escorted treasure convoys as *targets*); spyglass
+enemy-intel; boarding-assist consort order; brig/frigate diorama-ship variants
+(trade-up currently *downgrades* the art out of the carved sloop); visible
+gusts/lulls on the sea (wind-shift sequel); crew-quality refit (the
+`surgeonsMate` hook in boardingConfig is reserved for this — also a candidate
+mid-game money sink); price impact from your own trades; notoriety-driven navy
+hunts/blockades; meta-progression between runs; branching route map;
+weather/day-night; richer boarding-crowd figures; combat SFX samples (asset
 sourcing). Design-gated (need the human): player-ownable rule-breaker ships; the
 title.
