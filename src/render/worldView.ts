@@ -54,19 +54,24 @@ export class WorldView {
     const sandMat = new THREE.MeshLambertMaterial({ color: 0xc9b380 });
     const rockNames = ['rocks-a', 'rocks-b', 'rocks-c'];
     ISLANDS.forEach((isl, idx) => {
+      // overlapping landmass circles get a per-index height stagger so their
+      // coplanar tops never z-fight; the terracing reads as carved elevation
       const sand = new THREE.Mesh(new THREE.CylinderGeometry(isl.r, isl.r * 1.18, 16, 22), sandMat);
-      sand.position.set(isl.x, 2, isl.y);
+      sand.position.set(isl.x, 2 + (idx % 5) * 0.8, isl.y);
       this.group.add(sand);
       // deterministic scatter from the island index
       const h = (n: number) => {
         const x = Math.sin(idx * 37.7 + n * 91.3) * 43758.5453;
         return x - Math.floor(x);
       };
-      const nRocks = 3 + Math.floor(h(1) * 3);
+      // rock size follows a CLAMPED radius: the landmass chains (Cuba runs to
+      // r 800) should read as ranges of carved peaks, not one monolith each
+      const propR = Math.min(isl.r, 420);
+      const nRocks = 3 + Math.floor(h(1) * 3) + (isl.r > 450 ? 2 : 0);
       for (let i = 0; i < nRocks; i++) {
         const a = h(i + 2) * TAU;
         const rr = isl.r * (0.15 + 0.55 * h(i + 9));
-        const rock = lib.instantiateProp(rockNames[(idx + i) % 3], isl.r * (0.16 + h(i + 20) * 0.1));
+        const rock = lib.instantiateProp(rockNames[(idx + i) % 3], propR * (0.16 + h(i + 20) * 0.1));
         rock.position.set(isl.x + Math.cos(a) * rr, 8, isl.y + Math.sin(a) * rr);
         rock.rotation.y = h(i + 30) * TAU;
         this.group.add(rock);

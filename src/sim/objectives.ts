@@ -15,15 +15,15 @@ export type Objective =
 export const OBJECTIVES: Objective[] = [
   { kind: 'fight', n: 1, label: 'ACTION 1 — SAIL TO THE GOLD MARK' },
   {
-    kind: 'port', id: 'wreckers',
-    label: 'MAKE PORT AT WRECKERS’ BAY — MEND, HIRE, TRADE',
-    arrival: 'Wreckers’ Bay. Repair what’s holed, hire hands if you bled, and buy cheap rum — it sells dear out east.',
+    kind: 'port', id: 'antonio',
+    label: 'MAKE PORT AT PORT ANTONIO — MEND, HIRE, TRADE',
+    arrival: 'Port Antonio. Repair what’s holed, hire hands if you bled, and buy cheap rum — Jamaica makes it, the buccaneers drink it.',
   },
   { kind: 'fight', n: 2, label: 'ACTION 2 — SAIL TO THE GOLD MARK' },
   {
-    kind: 'port', id: 'corona',
-    label: 'CARRY YOUR GOODS EAST TO PUERTO CORONA',
-    arrival: 'Puerto Corona pays western prices for nothing and eastern prices for everything. Sell high. That’s the whole trick.',
+    kind: 'port', id: 'petitgoave',
+    label: 'CARRY YOUR GOODS EAST TO PETIT-GOÂVE',
+    arrival: 'Petit-Goâve pays Jamaica prices for nothing and buccaneer prices for everything. Sell high. That’s the whole trick.',
   },
   { kind: 'fight', n: 3, label: 'ACTION 3 — TWO SLOOPS. TRY TAKING ONE.' },
   { kind: 'fight', n: 4, label: 'ACTION 4 — SAIL TO THE GOLD MARK' },

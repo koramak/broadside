@@ -37,6 +37,8 @@ export interface Contact {
   brokeOff?: boolean;
   /** if set, this contact is a contract's quarry — defeating her settles it */
   bountyId?: number;
+  /** seconds spent pinned against a coast — lane traffic re-routes when stuck */
+  stuckT?: number;
 }
 
 export interface Crate {
@@ -226,6 +228,7 @@ export class World {
     const x = this.player.x + Math.cos(a) * SPAWN_BUBBLE;
     const y = this.player.y + Math.sin(a) * SPAWN_BUBBLE;
     if (Math.abs(x) > WORLD.width / 2 - 300 || Math.abs(y) > WORLD.height / 2 - 300 || x > WORLD.mistX - 300) return;
+    if (this.onLand(x, y)) return; // no sails sprouting from a hillside
     const ship = makeShip(spec.ships[0], 'e', x, y, rng.rnd(TAU));
     ship.faction = spec.faction;
     const c: Contact = { id: this.nextId++, spec, ship, wpX: x, wpY: y, gone: false };
@@ -241,6 +244,7 @@ export class World {
     const x = this.player.x + Math.cos(a) * SPAWN_BUBBLE * 0.7;
     const y = this.player.y + Math.sin(a) * SPAWN_BUBBLE * 0.7;
     if (Math.abs(x) > WORLD.width / 2 - 300 || Math.abs(y) > WORLD.height / 2 - 300 || x > WORLD.mistX - 300) return;
+    if (this.onLand(x, y)) return;
     const ship = makeShip(b.bountyCls!, 'e', x, y, rng.rnd(TAU));
     ship.faction = b.bountyFaction;
     ship.name = b.bountyName!;
@@ -309,6 +313,17 @@ export class World {
       }
       if (dist(s, { x: c.wpX, y: c.wpY }) < 250) this.pickWaypoint(c);
     }
+    // real coastlines strand straight-line sailors: a contact ground against
+    // land long enough gives up on that waypoint and picks another
+    if (s.speed < 12 && s.sailIdx > 0) {
+      c.stuckT = (c.stuckT ?? 0) + dt;
+      if (c.stuckT > 10) {
+        c.stuckT = 0;
+        this.pickWaypoint(c);
+      }
+    } else {
+      c.stuckT = 0;
+    }
     const want = Math.atan2(ty - s.y, tx - s.x);
     const err = normAng(want - s.heading);
     s.rudder = Math.abs(err) < 0.07 ? 0 : err > 0 ? 1 : -1;
@@ -318,6 +333,11 @@ export class World {
     if (c.spec.ghost) s.x = Math.max(s.x, WORLD.mistX + 60);
     else s.x = Math.min(s.x, WORLD.mistX - 80);
     this.collideIslands(s);
+  }
+
+  /** True if a point sits on (or hard against) a landmass — spawn guard. */
+  private onLand(x: number, y: number): boolean {
+    return ISLANDS.some((isl) => Math.hypot(x - isl.x, y - isl.y) < isl.r + 90);
   }
 
   private collideIslands(s: Ship): void {
@@ -576,7 +596,7 @@ export class World {
       if (run.battle <= 6) {
         this.events.feed('The trail leads on. Action ' + run.battle + ' is marked on your chart.');
       } else if (run.battle === 7) {
-        this.events.feed('East of the Tessellate, the Mist is... folding back. It looks like an invitation. It is not a kind one.');
+        this.events.feed('East of Santo Domingo, the Mist is... folding back. It looks like an invitation. It is not a kind one.');
       } else if (run.battle <= 9) {
         this.events.feed('Deeper. The next mark is past where charts apologize and stop.');
       }

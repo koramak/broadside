@@ -276,7 +276,7 @@ harbor.onSetSail = () => {
   }
   if (currentEnc && currentEnc.story === 6) {
     hud.clearFeed();
-    hud.feed('The Plate Ship is yours. And east of the Tessellate, the Mist just... opened.');
+    hud.feed('The Plate Ship is yours. And east of Santo Domingo, the Mist just... opened.');
     hud.feed('Three more marks on a chart that no longer believes in itself.');
   }
   currentEnc = null;

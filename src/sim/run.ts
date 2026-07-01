@@ -92,11 +92,20 @@ function addPriceTip(run: RunState, rng: Rng, events: EventQueue, smudged: boole
 
 function markShipwreck(run: RunState, rng: Rng, events: EventQueue): void {
   const cand = ISLANDS.filter((i) => i.x < WORLD.mistX - 300);
-  const isl = cand[rng.int(cand.length)];
-  const a = rng.rnd(0, Math.PI * 2);
-  const d = isl.r + rng.rnd(180, 380);
-  const wx = isl.x + Math.cos(a) * d;
-  const wy = isl.y + Math.sin(a) * d;
+  // real landmasses overlap, so a ring around one island can land on its
+  // neighbor — retry until the wreck sits in open water (bounded, deterministic)
+  let wx = 0;
+  let wy = 0;
+  for (let tries = 0; tries < 20; tries++) {
+    const isl = cand[rng.int(cand.length)];
+    const a = rng.rnd(0, Math.PI * 2);
+    const d = isl.r + rng.rnd(180, 380);
+    wx = isl.x + Math.cos(a) * d;
+    wy = isl.y + Math.sin(a) * d;
+    const clear = ISLANDS.every((o) => Math.hypot(wx - o.x, wy - o.y) > o.r + 90)
+      && wx < WORLD.mistX - 150 && Math.abs(wx) < WORLD.width / 2 - 200 && Math.abs(wy) < WORLD.height / 2 - 200;
+    if (clear) break;
+  }
   run.shipwrecks.push({ x: wx, y: wy }); // spawns the floating crates
   run.salvageMarks.push({ x: wx, y: wy }); // and a persistent mark on the chart
   const line = 'Her log marks a wreck off the reefs — cargo still bobbing free.';
