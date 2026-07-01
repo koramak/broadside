@@ -3,7 +3,7 @@
 
 import {
   AMMO, ARC, ARENA_R, CAPTAINS, CLASSES, DOCTRINES,
-  GUN_RANGE, SHIP_NAMES,
+  GUN_RANGE, SHIP_NAMES, WIND_SHIFT,
 } from './constants';
 import { TUNING } from './tuning';
 import type { Captain, ShipClass } from './constants';
@@ -30,6 +30,25 @@ import type { BarkKey } from './captains';
 export type BattleOutcome =
   | { result: 'won'; salvage: number; pressed: number }
   | { result: 'lost' };
+
+/** A wind shift in flight: 'warn' = the glass has fallen but the wind hasn't
+ *  moved yet; 'shifting' = the veer itself. The HUD draws targetDir as a
+ *  ghost arrow on the rose so the change is readable before it lands. */
+export interface WindShift {
+  phase: 'warn' | 'shifting';
+  targetDir: number;
+  startDir: number;
+  t: number;
+  T: number;
+}
+
+/** Name the direction the wind blows TOWARD, matching the HUD rose (screen
+ *  north = up). Eight points, sailor contractions. */
+const COMPASS = ['nor’', 'nor’east', 'east', 'sou’east', 'sou’', 'sou’west', 'west', 'nor’west'];
+function compassWord(dir: number): string {
+  const deg = ((dir * 180) / Math.PI + 90 + 360) % 360;
+  return COMPASS[Math.round(deg / 45) % 8];
+}
 
 /** What the player is fighting and why — built by the world map (or, for
  *  story actions, straight from the locked ESCALATION table). */
@@ -80,6 +99,12 @@ export class Battle {
   board: BoardingState | null = null;
   formUp = false;
 
+  /** the telegraphed mid-battle wind shift (null = steady). HUD reads this. */
+  shift: WindShift | null = null;
+  /** countdown to the next shift warning (public so tests can force one) */
+  nextShiftIn = 9999;
+  private shiftsEnabled = true;
+
   private volleyRakeLogged = new Set<number>();
   private volleyCounter = 0;
   /** seconds since the last consort-contentment sample (loyalty drift) */
@@ -98,6 +123,10 @@ export class Battle {
     this.rng = new Rng(seed);
     const rng = this.rng;
     this.wind = { dir: rng.rnd(TAU), drift: rng.rnd(-0.012, 0.012) };
+    // Mid-battle wind shifts re-deal the weather gauge; the first guided
+    // action stays steady so the tutorial fight reads clean.
+    this.shiftsEnabled = spec.story !== 1;
+    this.nextShiftIn = rng.rnd(WIND_SHIFT.firstMin, WIND_SHIFT.firstMax);
 
     const caps = rng.shuffle(CAPTAINS.slice());
     const nameBag = rng.shuffle(SHIP_NAMES.slice());
@@ -253,6 +282,45 @@ export class Battle {
         x: s.x - Math.cos(s.heading) * s.len * 0.45,
         y: s.y - Math.sin(s.heading) * s.len * 0.45,
       });
+    }
+  }
+
+  /** Advance the wind-shift machine (sail phase only, so a shift never lands
+   *  silently mid-boarding). A shift is telegraphed — the glass falls, a feed
+   *  line names the new quarter, the rose grows a ghost arrow — then the wind
+   *  eases through the veer over several seconds. Slow enough to answer with
+   *  the helm; never a snap. The weather gauge re-deals itself as it moves. */
+  private stepWindShift(dt: number): void {
+    if (!this.shiftsEnabled) return;
+    const ws = this.shift;
+    if (!ws) {
+      this.nextShiftIn -= dt;
+      if (this.nextShiftIn <= 0) {
+        const sign = this.rng.random() < 0.5 ? -1 : 1;
+        const target = normAng(this.wind.dir + sign * this.rng.rnd(WIND_SHIFT.amtMin, WIND_SHIFT.amtMax));
+        this.shift = { phase: 'warn', targetDir: target, startDir: this.wind.dir, t: 0, T: WIND_SHIFT.warnS };
+        this.events.feed('The glass falls — the wind will come round to blow ' + compassWord(target));
+        this.events.emit({ kind: 'windWarn' });
+      }
+      return;
+    }
+    ws.t += dt;
+    if (ws.phase === 'warn') {
+      if (ws.t >= ws.T) {
+        this.shift = {
+          phase: 'shifting', targetDir: ws.targetDir, startDir: this.wind.dir,
+          t: 0, T: this.rng.rnd(WIND_SHIFT.veerMinS, WIND_SHIFT.veerMaxS),
+        };
+      }
+      return;
+    }
+    const k = clamp(ws.t / ws.T, 0, 1);
+    const e = k * k * (3 - 2 * k); // smoothstep — the veer breathes in and out
+    this.wind.dir = normAng(ws.startDir + normAng(ws.targetDir - ws.startDir) * e);
+    if (k >= 1) {
+      this.shift = null;
+      this.nextShiftIn = this.rng.rnd(WIND_SHIFT.gapMin, WIND_SHIFT.gapMax);
+      this.events.feed('The wind settles, blowing ' + compassWord(this.wind.dir) + ' — trim for it');
     }
   }
 
@@ -848,6 +916,7 @@ export class Battle {
     this.simClock += dt;
     this.wind.dir = normAng(this.wind.dir + this.wind.drift * dt);
     if (this.phase === 'sail') {
+      this.stepWindShift(dt);
       const me = this.P();
       me.rudder = this.playerRudder;
       // weather gauge: computed for the controlled ship, as in the prototype

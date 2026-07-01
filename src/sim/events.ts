@@ -13,6 +13,7 @@ export type SimEvent =
   | { kind: 'impact'; x: number; y: number } // ball struck timber
   | { kind: 'splash'; x: number; y: number } // ball found only sea
   | { kind: 'wake'; x: number; y: number }
+  | { kind: 'windWarn' } // the glass falls — a wind shift has been telegraphed
   | { kind: 'battleWon' }
   | { kind: 'runOver'; title: string; text: string }
   | { kind: 'shipSunk'; ship: Ship }

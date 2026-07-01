@@ -168,6 +168,8 @@ export class Hud {
       $('orderbtn').style.display = 'none';
       $('boardbtn').style.display = 'none';
       $('hint').style.display = 'none';
+      $('roseshift').style.display = 'none'; // shifts pause during the deck fight
+      $('windshift').style.display = 'none';
       return; // the station deck (syncBoarding) carries the rest
     }
     $('hint').style.display = '';
@@ -184,6 +186,25 @@ export class Hud {
       `rotate(${((battle.wind.dir * 180) / Math.PI + 90).toFixed(1)} 27 27)`,
     );
     $('knots').textContent = (s.speed / 14).toFixed(1) + ' kn';
+
+    // wind-shift telegraph: a ghost arrow at the incoming quarter + a countdown
+    const ws = battle.shift;
+    const shiftArrow = $('roseshift');
+    const shiftLbl = $('windshift');
+    if (ws) {
+      shiftArrow.style.display = '';
+      shiftArrow.setAttribute(
+        'transform',
+        `rotate(${((ws.targetDir * 180) / Math.PI + 90).toFixed(1)} 27 27)`,
+      );
+      shiftLbl.style.display = '';
+      shiftLbl.textContent = ws.phase === 'warn'
+        ? 'WIND COMING ABOUT — ' + Math.max(1, Math.ceil(ws.T - ws.t)) + 's'
+        : 'THE WIND VEERS';
+    } else {
+      shiftArrow.style.display = 'none';
+      shiftLbl.style.display = 'none';
+    }
 
     for (let i = 0; i < 2; i++) {
       const btn = $(i ? 'fstbd' : 'fport') as HTMLButtonElement;
@@ -526,6 +547,8 @@ export class Hud {
       `rotate(${((world.wind.dir * 180) / Math.PI + 90).toFixed(1)} 27 27)`,
     );
     $('knots').textContent = (p.speed / 14).toFixed(1) + ' kn';
+    $('roseshift').style.display = 'none'; // the chart wind drifts, never shifts
+    $('windshift').style.display = 'none';
     const obj = currentObjective(run);
     $('battleno').textContent = obj ? obj.label : 'THE SEA REMEMBERS YOU';
 

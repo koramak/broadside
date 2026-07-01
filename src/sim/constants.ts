@@ -92,6 +92,23 @@ export const ESCALATION: Wave[] = [
 export const PRIZE_VALUE: Record<ShipClass, number> = { sloop: 30, brig: 50, frigate: 80 };
 export const CREW_COST: Record<ShipClass, number> = { sloop: 30, brig: 45, frigate: 70 };
 
+/* ============ mid-battle wind shifts (NEW system — tuning open, not locked) ============ */
+
+/** The wind comes about mid-fight: telegraphed, then a slow veer that re-deals
+ *  the weather gauge. Every value here is a FEEL dial awaiting playtests. */
+export const WIND_SHIFT = {
+  /** seconds into the battle before the first shift can be called */
+  firstMin: 25, firstMax: 45,
+  /** seconds between one shift settling and the next warning */
+  gapMin: 40, gapMax: 75,
+  /** telegraph lead — the glass falls this long before the wind moves */
+  warnS: 12,
+  /** how long the veer itself takes (slow enough to answer with the helm) */
+  veerMinS: 8, veerMaxS: 14,
+  /** size of the veer in radians (≈ 29–60°); direction of swing is random */
+  amtMin: 0.5, amtMax: 1.05,
+};
+
 export type RefitKey = 'canvas' | 'guns' | 'timbers';
 
 export const STRIP_LOOT: Record<ShipClass, [RefitKey, string]> = {

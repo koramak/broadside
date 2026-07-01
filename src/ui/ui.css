@@ -26,6 +26,10 @@ html,body{height:100%;overflow:hidden;background:var(--ink);font-family:Georgia,
 #rose svg{position:absolute;inset:0}
 #knots{font-family:'Courier New',monospace;font-size:19px;color:var(--parch-dim)}
 #battleno{font-family:'Courier New',monospace;font-size:15px;color:var(--gold);letter-spacing:.08em;max-width:420px}
+/* wind-shift telegraph: ghost arrow + label pulse together until the veer settles */
+#windshift{font-family:'Courier New',monospace;font-size:12px;color:var(--rust);letter-spacing:.08em;animation:windpulse 1.1s ease-in-out infinite}
+#roseshift{animation:windpulse 1.1s ease-in-out infinite}
+@keyframes windpulse{0%,100%{opacity:.4}50%{opacity:1}}
 #pausebtn{position:fixed;top:14px;left:calc(50% + 130px);width:48px;height:48px;font-size:21px;border-radius:50%;font-family:Georgia,serif;z-index:5}
 button{font-family:'Courier New',monospace;background:rgba(233,220,190,.08);border:1px solid rgba(233,220,190,.3);color:var(--parch);border-radius:7px;cursor:pointer;user-select:none;-webkit-user-select:none}
 button:active{background:rgba(233,220,190,.22)}

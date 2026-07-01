@@ -5,7 +5,7 @@
 import './ui/ui.css';
 import { Battle } from './sim/battle';
 import type { BattleSpec } from './sim/battle';
-import { SIM_DT } from './sim/constants';
+import { SIM_DT, WIND_SHIFT } from './sim/constants';
 import { newRun, topUpCrew, chronicle, desertionSweep } from './sim/run';
 import { bark } from './sim/captains';
 import { clampCargo } from './sim/economy';
@@ -24,7 +24,7 @@ import { HarborScreen } from './ui/harbor';
 import { PortScreen } from './ui/port';
 import { Input } from './input/input';
 import { Minimap, BigMap } from './ui/minimap';
-import { audio, boom, setMusic, boardTick, boardFoul, woodHit, splash, chime } from './audio';
+import { audio, boom, setMusic, boardTick, boardFoul, woodHit, splash, chime, windWhoosh } from './audio';
 import { currentObjective, objectivePos, onDocked } from './sim/objectives';
 import { refreshRumors } from './sim/economy';
 import { deliverAtPort, generateBoard } from './sim/contracts';
@@ -354,6 +354,14 @@ $('pabandon').addEventListener('click', () => {
   showRunOver('RUN ABANDONED', 'You turn for home with what you have. The sea shrugs.');
 });
 
+/** Distance-scaled camera kick: hits near the helm bump the table hard,
+ *  action across the arena barely registers. Battle mode only. */
+function kickAt(x: number, y: number, base: number): void {
+  if (mode !== 'battle' || !battle) return;
+  const p = battle.P();
+  shell.kick(base * Math.max(0, 1 - Math.hypot(x - p.x, y - p.y) / 700));
+}
+
 /* ============ outcome handling ============ */
 
 function handleBattleOutcome(): void {
@@ -455,10 +463,12 @@ function frame(now: number): void {
           break;
         case 'muzzle':
           effects.smoke(e.x, e.y, e.dir);
+          kickAt(e.x, e.y, 0.09); // per-gun, so a broadside stacks to a thump
           break;
         case 'impact':
           effects.impact(e.x, e.y);
           woodHit(0.4);
+          kickAt(e.x, e.y, 0.3);
           break;
         case 'splash':
           effects.splash(e.x, e.y);
@@ -466,6 +476,13 @@ function frame(now: number): void {
           break;
         case 'wake':
           effects.wake(e.x, e.y);
+          break;
+        case 'windWarn':
+          windWhoosh(); // the glass falls — hear it before you feel it
+          break;
+        case 'shipSunk':
+          effects.sinkBurst(e.ship.x, e.ship.y);
+          kickAt(e.ship.x, e.ship.y, 0.5);
           break;
         case 'boardWindow':
           boardTick(e.station); // the pitched percussion cue
@@ -606,6 +623,7 @@ window.__broadside = {
   startRun,
   enterMap,
   handleBattleOutcome,
+  WIND_SHIFT,
   get frames() {
     return frameCount;
   },

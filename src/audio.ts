@@ -254,6 +254,27 @@ export function woodHit(vol = 0.4): void {
   src.start();
 }
 
+/** The glass falls — a low airy swell telegraphing a mid-battle wind shift. */
+export function windWhoosh(): void {
+  if (!AC) return;
+  const t = AC.currentTime;
+  const src = AC.createBufferSource();
+  src.buffer = noiseBuf(1.8, 0.7);
+  const f = AC.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 1.6;
+  f.frequency.setValueAtTime(180, t);
+  f.frequency.exponentialRampToValueAtTime(760, t + 1.2);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.16, t + 0.55);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+  src.connect(f);
+  f.connect(g);
+  g.connect(AC.destination);
+  src.start();
+}
+
 /** A reward earned — a bright two-note bell (contracts paid, prizes claimed). */
 export function chime(): void {
   if (!AC) return;
