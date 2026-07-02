@@ -51,6 +51,29 @@ export class ShipView {
         });
       }
 
+      // the edge-of-map horrors are built of the wrong materials — the locked
+      // art language made literal: whale ivory, bottle glass, black pearl
+      const MONSTER_SKIN: Record<string, { color: number; emissive: number; opacity: number }> = {
+        scrimshander: { color: 0xe9e6da, emissive: 0x2c2a22, opacity: 1 },
+        greenglass: { color: 0x8fbf9f, emissive: 0x123528, opacity: 0.55 },
+        nacre: { color: 0x342d45, emissive: 0x32204a, opacity: 1 },
+      };
+      const skin = ship.monster ? MONSTER_SKIN[ship.monster] : undefined;
+      if (skin) {
+        const tint = new THREE.Color(skin.color);
+        model.root.traverse((o) => {
+          if (o instanceof THREE.Mesh) {
+            const m = o.material as THREE.MeshStandardMaterial;
+            m.color.lerp(tint, 0.92);
+            if (m.emissive) m.emissive.setHex(skin.emissive);
+            if (skin.opacity < 1) {
+              m.transparent = true;
+              m.opacity = skin.opacity;
+            }
+          }
+        });
+      }
+
       for (const m of model.hullMeshes) {
         const mat = m.material as THREE.MeshStandardMaterial;
         this.hullMats.push(mat);

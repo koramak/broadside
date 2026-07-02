@@ -23,7 +23,8 @@ export function newRun(): RunState {
     revealedSecrets: [],
     shipwrecks: [],
     salvageMarks: [],
-    gear: { swivels: false, pumps: false },
+    gear: { swivels: false, pumps: false, copper: false, mate: false, drypowder: false, lockers: false },
+    monstersSlain: [],
     stores: EASY.on ? EASY.startingStores : 20,
     pool: 0,
     up: { canvas: 0, guns: 0, timbers: 0 },
@@ -46,12 +47,13 @@ export function newRun(): RunState {
   };
 }
 
-/** Flagship stats with refits applied — identical math to the prototype. */
+/** Flagship stats with refits applied — identical math to the prototype
+ *  (copper sheathing is the one chandler bolt-on that touches these). */
 export function flagStats(run: RunState): ClassDef {
   const c = CLASSES[run.flag.cls];
   return {
     name: c.name,
-    maxSpd: c.maxSpd * Math.pow(1.08, run.up.canvas),
+    maxSpd: c.maxSpd * Math.pow(1.08, run.up.canvas) * (run.gear.copper ? 1.06 : 1),
     turn: c.turn,
     hull: Math.round(c.hull * Math.pow(1.2, run.up.timbers)),
     crew: c.crew,
@@ -229,30 +231,41 @@ export function musterCrew(run: RunState): boolean {
 /* Historically grounded bolt-ons. The refit axes (canvas/guns/timbers) share
  * their ×3 caps with prize-stripping; gear is one-time. */
 
+export type GearKey = 'swivels' | 'pumps' | 'copper' | 'mate' | 'drypowder' | 'lockers';
+
 export interface ChandlerItem {
-  key: 'guns' | 'canvas' | 'timbers' | 'swivels' | 'pumps';
+  key: 'guns' | 'canvas' | 'timbers' | GearKey;
   label: string;
   desc: string;
   cost: number;
 }
 
+/** FEEL (2026-07-01): the back half of this list is new — the mid-game money
+ *  sink. Prices rise with power so late contracts have somewhere to go. */
 export const CHANDLER: ChandlerItem[] = [
   { key: 'guns', label: 'LONG NINES', desc: '+1 cannon per side', cost: 25 },
   { key: 'canvas', label: 'FRESH CANVAS', desc: '+8% speed', cost: 20 },
   { key: 'timbers', label: 'SEASONED OAK', desc: '+20% hull', cost: 30 },
   { key: 'swivels', label: 'SWIVEL GUNS', desc: 'rail guns — boarding hits +25%', cost: 22 },
   { key: 'pumps', label: 'CHAIN PUMPS', desc: 'carpenter patches to 50% at sea', cost: 18 },
+  { key: 'lockers', label: 'GRAPE LOCKERS', desc: 'packed canister — grape kills +20%', cost: 45 },
+  { key: 'mate', label: 'SURGEON’S MATE', desc: 'a second pair of hands — faster surgery, wider window', cost: 55 },
+  { key: 'copper', label: 'COPPER SHEATHING', desc: 'a clean hull — +6% speed, always', cost: 60 },
+  { key: 'drypowder', label: 'DRY MAGAZINE', desc: 'lead-lined stores — guns reload 8% faster', cost: 65 },
 ];
 
+const isGear = (k: ChandlerItem['key']): k is GearKey =>
+  k !== 'guns' && k !== 'canvas' && k !== 'timbers';
+
 export function chandlerAvailable(run: RunState, item: ChandlerItem): boolean {
-  if (item.key === 'swivels' || item.key === 'pumps') return !run.gear[item.key];
+  if (isGear(item.key)) return !run.gear[item.key];
   return run.up[item.key] < 3;
 }
 
 export function buyChandler(run: RunState, item: ChandlerItem): boolean {
   if (!chandlerAvailable(run, item) || run.stores < item.cost) return false;
   run.stores -= item.cost;
-  if (item.key === 'swivels' || item.key === 'pumps') run.gear[item.key] = true;
+  if (isGear(item.key)) run.gear[item.key] = true;
   else run.up[item.key]++;
   return true;
 }

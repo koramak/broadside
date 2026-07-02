@@ -44,6 +44,8 @@ export interface Ship {
   faction?: FactionKey;
   /** the Drowned ignore the wind you spent a whole run learning */
   ghost?: boolean;
+  /** an edge-of-map horror (sim/monsters.ts) — each breaks its own rule */
+  monster?: string;
   /** 0..100 morale for a consort under your flag; seeded from the armada
    *  entry at battle start, drifts during the fight, written back at its end.
    *  undefined for the flagship and all enemies. */
@@ -63,6 +65,10 @@ export interface Ball {
   ammo: number;
   team: Team;
   vid: number;
+  /** the Greenglass's shot — draws NO fall-of-shot telegraph ring */
+  noTele?: boolean;
+  /** fired from grape lockers (chandler gear) — canister packed tighter */
+  grapeUp?: boolean;
 }
 
 export interface Wind {
@@ -134,7 +140,16 @@ export interface RunState {
   /** charted salvage sites — drawn on the chart until their crates are gathered */
   salvageMarks: { x: number; y: number }[];
   /** chandler gear: bolt-on historical upgrades */
-  gear: { swivels: boolean; pumps: boolean };
+  gear: {
+    swivels: boolean;
+    pumps: boolean;
+    copper: boolean;
+    mate: boolean;
+    drypowder: boolean;
+    lockers: boolean;
+  };
+  /** edge-of-map horrors put down this run — each kill IS its trophy */
+  monstersSlain: string[];
   stores: number;
   pool: number;
   up: Record<RefitKey, number>;

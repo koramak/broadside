@@ -4,7 +4,7 @@ Companion to CLAUDE.md (which holds locked canon + the file map / how-to-run).
 This file tracks what's actually built, what's in flight, and what's undecided.
 Keep it honest: describe what the code does, not what it's meant to do.
 
-_Last updated: 2026-07-01, end of the "real Caribbean chart" batch (the map is now the actual Windward Passage — Jamaica/Cuba/Hispaniola, historical ports; earlier today: wind shifts + battle juice). Working tree clean; everything below is committed + deployed._
+_Last updated: 2026-07-01, end of the "here be monsters + chandler" batch (three edge-of-map rule-breaker horrors with trophies; 4 new gear items = the mid-game money sink; same day: Windward Passage chart, wind shifts, battle juice). Working tree clean; everything below is committed + deployed._
 
 ## System status
 
@@ -22,7 +22,9 @@ _Last updated: 2026-07-01, end of the "real Caribbean chart" batch (the map is n
 | Legendary recruitable captains | **working** | `captains.ts` LEGENDS (6). Named characters with personal creed + signature hull + a QUIRK (steadfast/deadeye/ironhide/bloodthirsty), drinking in their flag's ports (deterministic per port+day), hired once each via the tavern. Personal barks over the temperament voice; ★ on cards/chips. |
 | Port events | **working** | `portEvents.ts`. Banner on docking (≈55%, deterministic per port+day, same-day re-roll guarded): passive (press-gang, fire, fever, festival, debt, rot) + choices (customs bribe/open, dockside duel, stowaway). Contraband makes customs bite. |
 | Boarding melee crowds | **working** | `render/boardingCrowd.ts`. Instanced miniature crew at the rail seam, gold vs rust, boundary slides with `board.front`, density tracks hand counts. The deferred "wow", now shipped. |
-| 6-action story → Plate Ship → 3 Mist actions → THE HARROW | **working** | `worldgen.ESCALATION` (locked) + Mist waves. Ghosts ignore the wind curve (the one shipped rule-breaker). |
+| 6-action story → Plate Ship → 3 Mist actions → THE HARROW | **working** | `worldgen.ESCALATION` (locked) + Mist waves. Ghosts ignore the wind curve. |
+| HERE BE MONSTERS (2026-07-01, human-requested; taxonomy designed in-conversation) | **working (tuning open)** | `sim/monsters.ts`. Three enemy-only, once-per-run horrors at the map's edges, gated to `battle ≥ 5`, each made of a locked art-canon "wrong material" and each breaking a DIFFERENT internalized rule: **THE SCRIMSHANDER** (bone, west) pivots at any speed — committed turning doesn't apply; **THE GREENGLASS** (bottle glass, south, translucent) — her volleys show no fall-of-shot rings; **THE NACRE** (black pearl, north) — hull re-lays at 2.6/s, damage is a race. Warning feed line 450 units out (fair notice), rise on deep entry, never strike, can't be grappled, chain/grape find little to bite. A kill IS its trophy (rule-abiding on purpose — player rule-breakers stay design-gated): Scrimshaw Charms (boarding windows +15%), Greenglass Lens (flagship always fires gauge-tight), Nacre Plating (flagship hull damage ×0.85) + 80–100 stores purse + gold toast. Chart shows animated "here be monsters" squiggles per live edge → "† …, slain" after. |
+| Chandler (upgrade variety + the money sink) | **working (prices open)** | `run.CHANDLER` grew 4 gear items: GRAPE LOCKERS 45 (grape kills +20%), SURGEON'S MATE 55 (wires the long-reserved `boardingConfig.surgeonsMate` hook), COPPER SHEATHING 60 (+6% speed), DRY MAGAZINE 65 (flagship reload +8%). Full late kit ≈ 225 stores — contracts finally have somewhere to go. **Bug fixed in passing:** SWIVEL GUNS ("boarding hits +25%") was sold but never applied — now scales swivel/pistol kills via `BoardingState.killMul`. |
 | Sea map (real-time wind sailing, contacts flee/hunt/lane, pursuit give-up, crates) | **working** | `world.ts`. Mortals won't enter the Mist; ghosts won't leave it. New with the real chart: contacts never spawn on land, and lane traffic pinned against a coast >10s re-picks its waypoint. |
 | The chart = the real WINDWARD PASSAGE (2026-07-01, human-chosen) | **working** | `worldgen.ts`. Jamaica, eastern Cuba, and Hispaniola authored as circle-chain landmasses from real positions (~1200 units/°lon, screen north = −y). Ports are historical and faction-true: Crown = Port Royal + Port Antonio; Compañía = Santiago de Cuba + Santo Domingo (the Mist-edge port); Brethren = Tortuga + Petit-Goâve — the literal Brethren of the Coast. Secrets: Île-à-Vache (Morgan's staging anchorage) + Cayo Levantado (Samaná). Story actions: Jamaica channel → gulf mouth → the Windward Passage itself → Tortuga's north water → old Bahama channel → Santo Domingo roadstead; the Mist swallows the Mona Passage. Verified by in-browser audit: no enclosed lagoons (interior fill islands), every port dockable, every mark reachable by flood-fill from the player's berth. Whole-Caribbean map deferred (test slice on purpose). Shipwreck drops retry until open water (`run.markShipwreck`). |
 | Trading economy (6 goods, port bias, day wobble) | **working** | `economy.ts`. Sinking now also drops floating cargo + rescued men. |
@@ -81,6 +83,13 @@ All TUNING-open, not design-open — playtest verdicts wanted on:
 - **Shake amplitude (NEW 2026-07-01)** — kick strengths in `main.ts` `kickAt`
   calls (muzzle 0.09/gun, impact 0.3, sinking 0.5) and the amplitude/decay in
   `renderer.ts`. Tuned subtle-first; turn it up if it doesn't register.
+- **Monster difficulty (NEW 2026-07-01)** — hull/speed/turn multipliers, the
+  Nacre's 2.6/s regen, the battle-5 gate, purse sizes, trophy strengths: all
+  in `sim/monsters.ts` + the trophy hooks in `battle.ts`/`boarding.ts`. The
+  intent is "rare and difficult — endgame challenges"; verdict wanted on
+  whether a full-kit late-run flagship finds them scary or farmable.
+- **Chandler prices (NEW 2026-07-01)** — the 4 new items (45–65) vs typical
+  late-run income. The sink should bite, not starve.
 
 Shipped 2026-07-01: **mid-battle wind shifts** and **screen-shake & juice**
 (both were backlog items; both are tuning-open above).

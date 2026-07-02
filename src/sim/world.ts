@@ -21,6 +21,7 @@ import { EASY } from './easing';
 import { activeBounty, completeBounty, expireContracts } from './contracts';
 import type { Contract } from './contracts';
 import type { GoodKey } from './economy';
+import { MONSTER_GATE_BATTLE, monsterById, monsterZoneAt } from './monsters';
 
 export interface Contact {
   id: number;
@@ -58,6 +59,8 @@ export interface EncounterSpec {
   loot: number;
   story?: number; // story action number if this is a spine battle
   ghost?: boolean;
+  /** an edge-of-map horror rising (sim/monsters.ts) */
+  monster?: string;
   names?: string[];
   x: number;
   y: number;
@@ -90,6 +93,8 @@ export class World {
   private mistFeedT = 14;
   private mistFeedIdx = 0;
   private blockedPortWarned = new Set<string>();
+  /** monster warning fed once per run per horror (their zones don't move) */
+  private monsterWarned = new Set<string>();
 
   playerRudder = 0;
   /** set each step: port you could dock at, encounter you just triggered */
@@ -574,6 +579,32 @@ export class World {
         }
       }
     }
+
+    // HERE BE MONSTERS — late in the run, the map's edges stop being empty.
+    // A warning band gives fair notice (committed decisions); sail deeper
+    // anyway and she rises. Once per run each; a kill is forever.
+    if (run.battle >= MONSTER_GATE_BATTLE) {
+      const near = monsterZoneAt(p.x, p.y, 450);
+      if (near && !run.monstersSlain.includes(near.id) && !this.monsterWarned.has(near.id)) {
+        this.monsterWarned.add(near.id);
+        this.events.feed(near.warn);
+      }
+      if (!this.pendingEncounter) {
+        const deep = monsterZoneAt(p.x, p.y, 0);
+        if (deep && !run.monstersSlain.includes(deep.id)) {
+          this.events.feed(deep.rise);
+          this.pendingEncounter = {
+            ships: [deep.base],
+            desc: deep.desc,
+            monster: deep.id,
+            names: [deep.name],
+            loot: 0,
+            x: p.x,
+            y: p.y,
+          };
+        }
+      }
+    }
   }
 
   /** Rep + loot bookkeeping after a battle the player won. */
@@ -589,6 +620,15 @@ export class World {
     }
     if (enc.ghost) {
       this.events.feed('What it was carrying glints like coin and smells like low tide. Salt-silver spends fine.');
+    }
+    // a monster put down: the kill IS the trophy, plus a purse of what she was
+    const mon = monsterById(enc.monster);
+    if (mon) {
+      run.monstersSlain.push(mon.id);
+      run.stores += mon.purse;
+      this.events.feed(mon.slain);
+      this.events.feed('From the wreckage: ' + mon.trophy.label + ' — ' + mon.trophy.desc + '. And ' + mon.purse + ' stores besides.');
+      this.events.emit({ kind: 'toast', title: mon.name + ' IS SLAIN', sub: mon.trophy.label + ' · +' + mon.purse + ' stores', tone: 'gold' });
     }
     if (enc.story) {
       run.battle++;

@@ -47,7 +47,10 @@ const TURN_AMP = 1.2;
  */
 export function stepShipPhysics(s: Ship, windDir: number, dt: number): void {
   const spdFac = clamp(s.speed / (s.maxSpd * SPEED_AMP), 0, 1);
-  s.heading = normAng(s.heading + s.rudder * s.turn * TURN_AMP * rudderFac(s) * (0.35 + 0.65 * spdFac) * dt);
+  // committed turning — except the Scrimshander, who pivots at any speed:
+  // a thing with a spine turns like a swimmer, not like a keel. Her one rule-break.
+  const commit = s.monster === 'scrimshander' ? 1 : 0.35 + 0.65 * spdFac;
+  s.heading = normAng(s.heading + s.rudder * s.turn * TURN_AMP * rudderFac(s) * commit * dt);
   // The Drowned ignore the point-of-sail curve. This is the rule-break the
   // whole run trains you to feel in your stomach.
   const eff = s.ghost ? Math.max(windEff(s.heading, windDir), 0.85) : windEff(s.heading, windDir);

@@ -442,6 +442,7 @@ function frame(now: number): void {
         plate: currentEnc.plate,
         story: currentEnc.story,
         ghost: currentEnc.ghost,
+        monster: currentEnc.monster,
         names: currentEnc.names,
       });
     }

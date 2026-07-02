@@ -141,7 +141,7 @@ export class PortScreen {
       const owned = !runOps.chandlerAvailable(run, item);
       const b = document.createElement('button');
       b.textContent = owned
-        ? item.label + ' — ' + (item.key === 'swivels' || item.key === 'pumps' ? 'fitted' : 'fully refitted')
+        ? item.label + ' — ' + (item.key === 'guns' || item.key === 'canvas' || item.key === 'timbers' ? 'fully refitted' : 'fitted')
         : item.label + ' — ' + item.desc + ' — ' + item.cost + ' stores';
       b.disabled = owned || run.stores < item.cost;
       b.addEventListener('click', () => {

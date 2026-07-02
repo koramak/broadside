@@ -4,6 +4,7 @@
 import type { World } from '../sim/world';
 import type { RunState } from '../sim/types';
 import { ISLANDS, PORTS, WORLD } from '../sim/worldgen';
+import { MONSTERS } from '../sim/monsters';
 import { currentObjective, objectivePos } from '../sim/objectives';
 import { $ } from './hud';
 
@@ -187,6 +188,33 @@ export class BigMap {
       g.arc(this.sx(isl.x), this.sy(isl.y), r, 0, Math.PI * 2);
       g.fill();
     }
+
+    // HERE BE MONSTERS — the chart is honest about its edges. A living
+    // squiggle while she's out there; a quiet cross once she's put down.
+    g.font = 'italic 12px Georgia, serif';
+    g.textAlign = 'center';
+    for (const m of MONSTERS) {
+      const cx = Math.min(W2 - 70, Math.max(70, this.sx((m.zone.x1 + m.zone.x2) / 2)));
+      const cy = Math.min(H2 - 10, Math.max(14, this.sy((m.zone.y1 + m.zone.y2) / 2)));
+      if (run.monstersSlain.includes(m.id)) {
+        g.fillStyle = 'rgba(233,220,190,.4)';
+        g.fillText('† ' + m.name.toLowerCase() + ', slain', cx, cy);
+        continue;
+      }
+      g.strokeStyle = 'rgba(196,88,58,.55)';
+      g.lineWidth = 1.4;
+      g.beginPath();
+      for (let i = 0; i <= 24; i++) {
+        const x = cx - 24 + i * 2;
+        const y = cy - 14 + Math.sin(i * 0.8 + time * 2) * 3;
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.stroke();
+      g.fillStyle = 'rgba(196,88,58,.7)';
+      g.fillText('here be monsters', cx, cy);
+    }
+    g.textAlign = 'left';
 
     // shipwreck salvage clusters (floating crates)
     g.fillStyle = 'rgba(180,210,215,.8)';

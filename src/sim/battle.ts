@@ -17,6 +17,7 @@ import type {
 } from './types';
 import * as boarding from './boarding';
 import { BOARD_CFG } from './boardingConfig';
+import { NACRE_REGEN, monsterById } from './monsters';
 import type { BoardingState } from './boarding';
 import type { RunState } from './types';
 import { applyKillRep, flagStats, rollPrizeLog, topUpCrew } from './run';
@@ -60,6 +61,8 @@ export interface BattleSpec {
   story?: number;
   /** the Drowned: wind-immune, never strike, cannot be boarded or taken */
   ghost?: boolean;
+  /** an edge-of-map horror (sim/monsters.ts) — single named rule-breaker */
+  monster?: string;
   names?: string[];
 }
 
@@ -169,6 +172,16 @@ export class Battle {
       this.ships.push(s);
     });
 
+    // gear + trophies ride into the fight as snapshots (sim stays run-free
+    // outside step); all of these touch the FLAGSHIP hull only
+    this.gearSwivels = run.gear.swivels;
+    this.gearMate = run.gear.mate;
+    this.gearDryPowder = run.gear.drypowder;
+    this.gearLockers = run.gear.lockers;
+    this.trophyCharms = run.monstersSlain.includes('scrimshander');
+    this.trophyLens = run.monstersSlain.includes('greenglass');
+    this.trophyPlate = run.monstersSlain.includes('nacre');
+
     // enemies from the encounter spec
     const a0 = rng.rnd(TAU);
     spec.ships.forEach((ecls, i) => {
@@ -194,6 +207,21 @@ export class Battle {
         // wind-immunity that makes them terrifying anyway
         const g = Math.ceil(e.gunsMax / 2);
         e.gunsLeft = [g, g];
+      }
+      // an edge-of-map horror: one named hull built from the wrong materials
+      const mon = monsterById(spec.monster);
+      if (mon) {
+        e.monster = mon.id;
+        e.name = mon.name;
+        e.captain = ['—', e.doctrine ?? 'bulldog'];
+        // the Scrimshander wants you in arc; the Greenglass hunts the stern
+        e.doctrine = mon.id === 'greenglass' ? 'corsair' : 'bulldog';
+        e.maxHull = Math.round(e.maxHull * mon.hullMul);
+        e.hull = e.maxHull;
+        e.maxCrew = Math.round(e.maxCrew * mon.crewMul);
+        e.crew = e.maxCrew;
+        e.maxSpd *= mon.spdMul;
+        e.turn *= mon.turnMul;
       }
       this.ships.push(e);
     });
@@ -255,6 +283,14 @@ export class Battle {
       s.y += Math.sin(s.heading) * s.speed * dt;
       return;
     }
+    // the Nacre's rule-break: her hull re-lays itself. Damage is a race.
+    if (s.monster === 'nacre' && s.hull < s.maxHull) {
+      s.hull = Math.min(s.maxHull, s.hull + NACRE_REGEN * dt);
+      if (!this.nacreSpoke) {
+        this.nacreSpoke = true;
+        this.events.feed('Her wounds glaze over with new shell — whatever you do to her, do it faster than she mends');
+      }
+    }
     stepShipPhysics(s, this.wind.dir, dt);
     const d = Math.hypot(s.x, s.y);
     if (d > ARENA_R) {
@@ -265,6 +301,8 @@ export class Battle {
     }
     let crewFac = 0.55 + 0.45 * (s.crew / s.maxCrew);
     if (s.gauge) crewFac *= 1.12;
+    // dry magazine (chandler): the flagship's cartridges come up ready
+    if (s === this.ships[0] && this.gearDryPowder) crewFac *= 1.08;
     // a consort's morale shows in her gun crew's pace (lower reloadMul = faster);
     // a deadeye's crews keep the devoted pace whatever her mood
     if (s.loyalty !== undefined) {
@@ -349,8 +387,13 @@ export class Battle {
     }
     const n = s.gunsLeft[side];
     const vid = ++this.volleyCounter;
-    const jit: [number, number] = s.gauge ? [0.92, 1.08] : [0.86, 1.14];
-    const sprd = s.gauge ? 0.10 : 0.14;
+    // the Greenglass Lens trophy: the flagship's gunners always read the water
+    // as if they held the gauge
+    const sharp = s.gauge || (s === this.ships[0] && this.trophyLens);
+    const jit: [number, number] = sharp ? [0.92, 1.08] : [0.86, 1.14];
+    const sprd = sharp ? 0.10 : 0.14;
+    const noTele = s.monster === 'greenglass' || undefined;
+    const grapeUp = (s === this.ships[0] && s.ammo === 2 && this.gearLockers) || undefined;
     let avgT = 0;
     for (let i = 0; i < n; i++) {
       const along = (n === 1 ? 0 : (i / (n - 1) - 0.5)) * s.len * 0.7;
@@ -362,7 +405,7 @@ export class Battle {
       const ly = py + Math.sin(dir) * landR;
       const T = landR / TUNING.ballSpd;
       avgT += T / n;
-      this.balls.push({ sx: px, sy: py, lx, ly, t: 0, T, dir, ammo: s.ammo, team: s.team, vid });
+      this.balls.push({ sx: px, sy: py, lx, ly, t: 0, T, dir, ammo: s.ammo, team: s.team, vid, noTele, grapeUp });
       this.events.emit({ kind: 'muzzle', x: px, y: py, dir });
     }
     s.reload[side] = TUNING.reloadBase;
@@ -406,14 +449,20 @@ export class Battle {
     }
     if (rake && tgt.team === 'e') this.lastEnemyRakeAt = this.simClock;
     // ghosts: round shot breaks the bones fine, but canvas-shredders and
-    // man-killers find nothing much to bite
-    const ghostSail = tgt.ghost ? 0.5 : 1;
-    const ghostCrew = tgt.ghost ? 0.3 : 1;
+    // man-killers find nothing much to bite. Monsters likewise — bone, glass
+    // and pearl carry no crew worth the name and no honest canvas.
+    const odd = !!tgt.ghost || !!tgt.monster;
+    const ghostSail = odd ? 0.5 : 1;
+    const ghostCrew = odd ? 0.3 : 1;
     // testing-phase easing: the player's fleet bruises 20% less
     const ease = EASY.on && tgt.team === 'p' ? EASY.dmgToPlayer : 1;
-    tgt.hull = Math.max(0, tgt.hull - a.hull * rng.rnd(0.7, 1.3) * mult * ease);
+    // Nacre Plating trophy: the flagship's pearl-laid strakes shrug 15%
+    const plate = tgt === this.ships[0] && this.trophyPlate ? 0.85 : 1;
+    // grape lockers (chandler): canister packed tighter kills 20% more
+    const canister = b.grapeUp ? 1.2 : 1;
+    tgt.hull = Math.max(0, tgt.hull - a.hull * rng.rnd(0.7, 1.3) * mult * ease * plate);
     tgt.sailHP = Math.max(0, tgt.sailHP - a.sail * rng.rnd(0.7, 1.3) * (rake ? 1.3 : 1) * ghostSail * ease);
-    tgt.crew = Math.max(0, tgt.crew - a.crew * rng.rnd(0.7, 1.3) * (rake ? 1.4 : 1) * ghostCrew * ease);
+    tgt.crew = Math.max(0, tgt.crew - a.crew * rng.rnd(0.7, 1.3) * (rake ? 1.4 : 1) * ghostCrew * ease * canister);
     if (loc.lx < -tgt.len * 0.25 && (b.ammo === 0 || b.ammo === 1)) {
       const before = tgt.rudderHP;
       tgt.rudderHP = Math.max(0, tgt.rudderHP - (b.ammo === 0 ? 15 : 8));
@@ -435,10 +484,12 @@ export class Battle {
     // the woody hit sound is played off the 'impact' event (audio.woodHit)
     if (tgt.hull <= 0 && !tgt.sinking) tgt.sinking = 0.001;
     if (tgt.crew <= Math.max(6, tgt.maxCrew * 0.08) && !tgt.struck && !tgt.sinking) {
-      if (tgt.ghost) {
+      if (tgt.ghost || tgt.monster) {
         // nothing aboard to surrender; what's left just stops pretending
         tgt.sinking = 0.001;
-        this.events.feed(tgt.name + ' forgets how to float');
+        this.events.feed(
+          tgt.monster ? tgt.name + ' loses whatever was working her guns — she founders' : tgt.name + ' forgets how to float',
+        );
       } else {
         tgt.struck = true;
         this.events.feed(tgt.name + ' strikes her colors!');
@@ -668,7 +719,8 @@ export class Battle {
     const foe = this.nearestEnemy(s);
     if (this.phase !== 'sail' || s.sinking > 0) return { ok: false, reason: 'none', foe: null };
     if (!foe) return { ok: false, reason: 'none', foe: null };
-    if (foe.ghost) return { ok: false, reason: 'ghost', foe };
+    // no grappling bone, glass, or pearl either — same refusal as ghosts
+    if (foe.ghost || foe.monster) return { ok: false, reason: 'ghost', foe };
     if (this.simClock < this.regrappleUntil) return { ok: false, reason: 'cooldown', foe };
     const d = dist(s, foe);
     if (d >= Battle.boardRange()) return { ok: false, reason: 'far', foe };
@@ -690,6 +742,16 @@ export class Battle {
   /** naval-state hooks for boarding, snapshotted at battle start */
   private refitGuns = 0;
   private refitTimbers = 0;
+  /** chandler gear + monster trophies (all flagship-only), snapshotted */
+  private gearSwivels = false;
+  private gearMate = false;
+  private gearDryPowder = false;
+  private gearLockers = false;
+  private trophyCharms = false;
+  private trophyLens = false;
+  private trophyPlate = false;
+  /** the Nacre announces her regeneration once, when you first wound her */
+  private nacreSpoke = false;
   /** when the enemy last ate a raking volley (cadence hook) */
   private lastEnemyRakeAt = -999;
   /** after a cut-away or stranding, the grapples need re-rigging */
@@ -716,7 +778,9 @@ export class Battle {
       rakedRecently: this.simClock - this.lastEnemyRakeAt < BOARD_CFG.rakeWindowS,
       secondSwivel: this.refitGuns >= 1,
       toughLines: this.refitTimbers >= 1,
-      surgeonsMate: false, // crew-quality refit hook — not yet purchasable
+      surgeonsMate: this.gearMate, // the chandler's crew-quality refit, at last
+      swivels: this.gearSwivels, // rail guns — swivel/pistol kills +25%
+      charmWindows: this.trophyCharms, // scrimshaw charms — gold windows +15%
     });
     // lash her alongside for the deck fight
     const me = this.P();

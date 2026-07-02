@@ -66,6 +66,8 @@ export interface BoardingState {
   eventGapMul: number;
   windowMul: number;
   frayMul: number;
+  /** swivel-guns gear: swivel + pistol kills scale by this */
+  killMul: number;
   surgeonsMate: boolean;
   helmLocked: boolean;
   clock: number;
@@ -77,7 +79,9 @@ export interface BoardingOpts {
   rakedRecently: boolean;
   secondSwivel: boolean; // GUNS refit ≥ 1
   toughLines: boolean; // TIMBERS refit ≥ 1
-  surgeonsMate: boolean; // future crew-quality refit
+  surgeonsMate: boolean; // SURGEON'S MATE chandler gear
+  swivels: boolean; // SWIVEL GUNS chandler gear — rail-gun kills +25%
+  charmWindows: boolean; // SCRIMSHAW CHARMS trophy — gold windows +15%
 }
 
 const mk = (id: StationId): Station => ({ id, phase: 'idle', t: 0, primeT: 0, windowT: 0, foulT: 0 });
@@ -110,8 +114,9 @@ export function startBoarding(me: Ship, foe: Ship, opts: BoardingOpts): Boarding
     axe: null,
     nextEventT: 4.5, // first demand comes early; outnumbered = clock from second one
     eventGapMul: opts.rakedRecently ? C.rakeCadenceMul : 1,
-    windowMul: (opts.gauge ? C.gaugeWindowMul : 1) * C.windowScale,
+    windowMul: (opts.gauge ? C.gaugeWindowMul : 1) * (opts.charmWindows ? 1.15 : 1) * C.windowScale,
     frayMul: opts.toughLines ? C.timbersFrayMul : 1,
+    killMul: opts.swivels ? 1.25 : 1,
     surgeonsMate: opts.surgeonsMate,
     helmLocked: false,
     clock: 0,
@@ -206,14 +211,14 @@ export function tap(
 /** Station succeeded inside its gold window. */
 function applyHit(b: BoardingState, id: StationId, rng: Rng, events: EventQueue): void {
   if (id === 'swivel' || id === 'swivel2') {
-    const kill = Math.round(rng.rnd(C.swivel.killMin, C.swivel.killMax));
+    const kill = Math.round(rng.rnd(C.swivel.killMin, C.swivel.killMax) * b.killMul);
     b.theirHands = Math.max(0, b.theirHands - kill);
     b.theirHalvedT = C.swivel.halveT;
     feedSurge(b, events);
     events.emit({ kind: 'boardFx', fx: 'swivel', n: kill });
     events.boom(0.34, 0.3, 520);
   } else if (id === 'pistols') {
-    const kill = Math.round(rng.rnd(C.pistols.killMin, C.pistols.killMax));
+    const kill = Math.round(rng.rnd(C.pistols.killMin, C.pistols.killMax) * b.killMul);
     b.theirHands = Math.max(0, b.theirHands - kill);
     b.front = Math.min(1, b.front + C.pistols.frontPush);
     b.myBoost = Math.min(0.6, b.myBoost + C.pistols.boost);

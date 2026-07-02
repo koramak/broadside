@@ -169,6 +169,8 @@ export class Effects {
       const active = !!b;
       bm.visible = sm.visible = lm.visible = active;
       if (!active) continue;
+      // the Greenglass's rule-break: her shot telegraphs nothing
+      if (b.noTele) lm.visible = false;
       const t = clamp(b.t / b.T, 0, 1);
       const x = lerp(b.sx, b.lx, t);
       const z = lerp(b.sy, b.ly, t);
